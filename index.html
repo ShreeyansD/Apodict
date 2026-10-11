@@ -9,6 +9,15 @@
     <meta property="og:description" content="Smart academic dashboard for college students to parse syllabi with Gemini AI, track course weights, manage deadlines, and get voice and research assistance." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- PWA: installable app -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Apodict" />
+
     <script>
       // Gracefully prevent Vite dev client websocket connection errors from bubbling to runner
       window.addEventListener('error', function(event) {
@@ -41,6 +50,14 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // Register the service worker only on the live site, so the AI Studio preview never caches anything
+      if ('serviceWorker' in navigator && /(^|\.)apodict\.app$|\.onrender\.com$/.test(location.hostname)) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
-
