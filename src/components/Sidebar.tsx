@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { 
   BookOpen, 
   CalendarDays, 
-  CheckCircle2, 
   GraduationCap, 
   Layers, 
   Mic, 
@@ -11,11 +10,12 @@ import {
   X,
   HardDrive,
   Bell,
-  Calendar
+  Calendar,
+  FileQuestion
 } from 'lucide-react';
 import { User } from '../services/firebase';
 
-export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'notifications' | 'calendar';
+export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'notifications' | 'calendar' | 'examprep';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -32,11 +32,18 @@ interface SidebarProps {
 }
 
 interface NavItem {
-  id: NavTab;
+  key: string;
   label: string;
   icon: any;
+  // Tab items switch the main view; action items open a panel or dialog
+  tab?: NavTab;
+  action?: () => void;
   badge?: string;
-  active?: boolean;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -57,40 +64,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const userDisplayName = user?.displayName || user?.email?.split('@')[0] || 'Student';
   const userInitial = (userDisplayName?.[0] || user?.email?.[0] || 'S').toUpperCase();
 
-  const navItems: NavItem[] = [
+  const navGroups: NavGroup[] = [
     {
-      id: 'courses' as NavTab,
-      label: 'Courses',
-      icon: BookOpen,
-      badge: courseCount > 0 ? `${courseCount}` : undefined,
-      active: true,
+      label: 'Semester',
+      items: [
+        {
+          key: 'courses',
+          tab: 'courses',
+          label: 'Courses',
+          icon: BookOpen,
+          badge: courseCount > 0 ? `${courseCount}` : undefined,
+        },
+        { key: 'collision', tab: 'collision', label: 'Collision Map', icon: Layers },
+        { key: 'planner', tab: 'planner', label: 'Planner', icon: CalendarDays },
+      ],
     },
     {
-      id: 'collision' as NavTab,
-      label: 'Collision Map',
-      icon: Layers,
+      label: 'Study',
+      items: [
+        { key: 'grades', tab: 'grades', label: 'Grades', icon: GraduationCap },
+        { key: 'examprep', tab: 'examprep', label: 'Exam Prep', icon: FileQuestion },
+        { key: 'voice', action: onOpenLiveVoice, label: 'Voice Advisor', icon: Mic },
+      ],
     },
     {
-      id: 'planner' as NavTab,
-      label: 'Planner',
-      icon: CalendarDays,
-    },
-    {
-      id: 'grades' as NavTab,
-      label: 'Grades',
-      icon: GraduationCap,
-    },
-    {
-      id: 'notifications' as NavTab,
-      label: 'Reminders',
-      icon: Bell,
-    },
-    {
-      id: 'calendar' as NavTab,
-      label: 'Calendar',
-      icon: Calendar,
+      label: 'Sync & Data',
+      items: [
+        { key: 'calendar', tab: 'calendar', label: 'Calendar', icon: Calendar },
+        { key: 'notifications', tab: 'notifications', label: 'Reminders', icon: Bell },
+        { key: 'backup', action: onOpenBackupRestore, label: 'Backup & Restore', icon: HardDrive },
+      ],
     },
   ];
+
+  const renderNavItem = (item: NavItem) => {
+    const Icon = item.icon;
+    const isSelected = !!item.tab && activeTab === item.tab;
+    return (
+      <button
+        key={item.key}
+        type="button"
+        onClick={() => {
+          if (item.tab) onSelectTab(item.tab);
+          else if (item.action) item.action();
+          setIsMobileOpen(false);
+        }}
+        aria-label={item.label}
+        aria-current={isSelected ? 'page' : undefined}
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all text-left cursor-pointer ${
+          isSelected
+            ? 'bg-indigo-600 text-white shadow-xs'
+            : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
+          <span>{item.label}</span>
+        </div>
+
+        {item.badge && (
+          <span
+            className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold ${
+              isSelected
+                ? 'bg-indigo-700 text-white'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            {item.badge}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <>
@@ -169,73 +214,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            Workspace
-          </div>
-
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isSelected = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  setIsMobileOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
-                  <span>{item.label}</span>
-                </div>
-
-                {item.badge && (
-                  <span
-                    className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold ${
-                      isSelected
-                        ? 'bg-indigo-700 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Backup & Restore button under navigation tabs */}
-          <button
-            onClick={() => {
-              onOpenBackupRestore();
-              setIsMobileOpen(false);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all text-left cursor-pointer"
-            aria-label="Backup & Restore"
-          >
-            <HardDrive className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            <span>Backup &amp; Restore</span>
-          </button>
-
-          {/* Voice Advisor - simple icon and name matching the other items */}
-          <button
-            onClick={() => {
-              onOpenLiveVoice();
-              setIsMobileOpen(false);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all text-left cursor-pointer"
-            aria-label="Voice Advisor"
-          >
-            <Mic className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            <span>Voice Advisor</span>
-          </button>
+        {/* Navigation Groups */}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto" aria-label="Main navigation">
+          {navGroups.map((group, groupIndex) => (
+            <div key={group.label} className={groupIndex === 0 ? '' : 'mt-5'}>
+              <div className="px-3 pb-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                {group.label}
+              </div>
+              <div className="space-y-1">{group.items.map(renderNavItem)}</div>
+            </div>
+          ))}
         </nav>
 
         {/* Bottom Student Stats Summary */}

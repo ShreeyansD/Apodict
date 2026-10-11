@@ -22,11 +22,17 @@ export const AI_RATE_LIMITS = {
   WINDOW_1_DAY_MS: 24 * 60 * 60 * 1000,
 };
 
+export const EXAM_PREP_RATE_LIMITS = {
+  MAX_REQUESTS_PER_HOUR: 10, // 10 generations per hour per student
+  WINDOW_1_HOUR_MS: 60 * 60 * 1000,
+};
+
 interface StudentAiUsage {
   timestamps: number[];
 }
 
 const usageByStudent = new Map<string, StudentAiUsage>();
+const examPrepUsageByStudent = new Map<string, StudentAiUsage>();
 
 export interface RateLimitCheckResult {
   allowed: boolean;
@@ -105,11 +111,38 @@ export function checkAndRecordAiRequest(
   return { allowed: true };
 }
 
+export function checkAndRecordExamPrepLimit(
+  studentId: string,
+  nowMs: number = Date.now()
+): RateLimitCheckResult {
+  const usage = examPrepUsageByStudent.get(studentId) || { timestamps: [] };
+  const hourTimestamps = usage.timestamps.filter((t) => nowMs - t < EXAM_PREP_RATE_LIMITS.WINDOW_1_HOUR_MS);
+
+  if (hourTimestamps.length >= EXAM_PREP_RATE_LIMITS.MAX_REQUESTS_PER_HOUR) {
+    const oldest = Math.min(...hourTimestamps);
+    const waitMs = oldest + EXAM_PREP_RATE_LIMITS.WINDOW_1_HOUR_MS - nowMs;
+    const retrySeconds = Math.max(1, Math.ceil(waitMs / 1000));
+    const minutesLeft = Math.ceil(retrySeconds / 60);
+
+    return {
+      allowed: false,
+      retryAfterSeconds: retrySeconds,
+      message: `You've reached your limit of ${EXAM_PREP_RATE_LIMITS.MAX_REQUESTS_PER_HOUR} exam prep generations per hour. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`,
+    };
+  }
+
+  hourTimestamps.push(nowMs);
+  examPrepUsageByStudent.set(studentId, { timestamps: hourTimestamps });
+  return { allowed: true };
+}
+
 export function resetStudentAiLimits(studentId?: string): void {
   if (studentId) {
     usageByStudent.delete(studentId);
+    examPrepUsageByStudent.delete(studentId);
   } else {
     usageByStudent.clear();
+    examPrepUsageByStudent.clear();
   }
 }
 

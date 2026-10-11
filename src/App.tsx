@@ -31,6 +31,7 @@ import { Planner } from './components/Planner';
 import { Grades } from './components/Grades';
 import { Notifications } from './components/Notifications';
 import { CalendarSync } from './components/CalendarSync';
+import { ExamPrep } from './components/ExamPrep';
 import { calendarSyncService } from './services/calendarSyncService';
 import { auth, onAuthStateChanged, firebaseSignOut, User } from './services/firebase';
 
@@ -812,6 +813,13 @@ export default function App() {
             {activeTab === 'planner' && (
               <Planner
                 courses={courses}
+                onOpenAddCourse={() => setIsAddModalOpen(true)}
+              />
+            )}
+            {activeTab === 'examprep' && (
+              <ExamPrep
+                courses={courses}
+                onOpenCourses={() => setActiveTab('courses')}
                 onOpenAddCourse={() => setIsAddModalOpen(true)}
               />
             )}

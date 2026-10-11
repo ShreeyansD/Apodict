@@ -10,7 +10,7 @@ import {
   Circle, 
   ChevronDown, 
   ChevronUp, 
-  AlertCircle 
+  AlertCircle
 } from 'lucide-react';
 import { Course } from '../types/academic';
 import { 
@@ -148,8 +148,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
   return (
     <div className="bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-150 ease-in-out flex flex-col">
-      {/* Top Banner & Color Accent */}
-      <div className="h-1.5 w-full" style={{ backgroundColor: course.color || '#3B82F6' }} />
+      {/* Top Banner & Color Accent (hidden when the course color is set to None; older courses without a color keep the default blue) */}
+      {course.color !== '' && (
+        <div className="h-1.5 w-full" style={{ backgroundColor: course.color || '#3B82F6' }} />
+      )}
 
       {/* Course Header */}
       <div className="p-5 sm:p-6 border-b border-slate-200/80 dark:border-slate-800/80 space-y-3">
@@ -166,7 +168,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             </span>
           </div>
 
-          {/* Action Buttons: 4 icon-only buttons with hover tooltips and accessible labels */}
+          {/* Action Buttons: icon-only buttons with hover tooltips and accessible labels */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"

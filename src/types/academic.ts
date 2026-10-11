@@ -131,3 +131,51 @@ export interface GradeFocusAnalysis {
   prioritizedActions: GradeFocusItem[];
   honestAdvice: string;
 }
+
+export type ExamPrepMode = 'questions' | 'guide';
+export type QuestionType = 'multiple_choice' | 'short_answer';
+
+export interface PracticeQuestion {
+  id: string;
+  type: QuestionType;
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  explanation: string;
+}
+
+export interface StudyGuideSection {
+  heading: string;
+  summary: string;
+  bulletPoints?: string[];
+}
+
+export interface KeyTerm {
+  term: string;
+  definition: string;
+}
+
+export interface StudyGuideData {
+  overview?: string;
+  likelyTopics: string[];
+  keyTerms: KeyTerm[];
+  sections: StudyGuideSection[];
+}
+
+export interface ExamPrepData {
+  id: string; // `${courseId}_${examId}`
+  courseId: string;
+  courseName: string;
+  examId: string;
+  examTitle: string;
+  examDate?: string | null;
+  mode: ExamPrepMode;
+  notes: string;
+  pdfNames?: string[];
+  notesTooThin?: boolean;
+  notesFeedback?: string | null;
+  questions?: PracticeQuestion[];
+  studyGuide?: StudyGuideData | null;
+  generatedAt: string;
+  updatedAt: string;
+}

@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,8 +10,10 @@ import {
   requireStudentAiAuthAndRateLimit,
   authenticateStudent,
   checkAndRecordAiRequest,
+  checkAndRecordExamPrepLimit,
   AI_RATE_LIMITS,
 } from './aiProtection.ts';
+import { generateFallbackExamPrep } from './examPrepFallback.ts';
 
 // Re-export AI_RATE_LIMITS so it is configured in one central place
 export { AI_RATE_LIMITS };
@@ -27,9 +29,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
-// Use 60mb limit for PDF syllabus uploads
-app.use(express.json({ limit: '60mb' }));
-app.use(express.urlencoded({ extended: true, limit: '60mb' }));
+// Standard body parser (does not apply to /api/exam-prep which has its own 5mb route parser)
+app.use((req, res, next) => {
+  if (req.path === '/api/exam-prep') {
+    return next();
+  }
+  express.json({ limit: '10mb' })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path === '/api/exam-prep') {
+    return next();
+  }
+  express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+});
 registerPhoneRoutes(app);
 
 // Initialize shared Gemini AI client with telemetry user-agent
@@ -41,7 +53,23 @@ const ai = new GoogleGenAI({
     },
   },
 });
-
+// Log the real error, show the user a safe message (never expose billing details)
+function sendAiError(res: Response, error: any, fallbackMsg: string) {
+  const raw = String(error?.message || error || '');
+  const lower = raw.toLowerCase();
+  const unavailable =
+    lower.includes('resource_exhausted') ||
+    lower.includes('credits') ||
+    lower.includes('quota') ||
+    lower.includes('"code":402') ||
+    lower.includes('"code":429');
+  if (unavailable) {
+    return res.status(503).json({
+      error: 'The AI service is temporarily unavailable. Please try again later.',
+    });
+  }
+  return res.status(502).json({ error: fallbackMsg });
+}
 // -------------------------------------------------------------
 // POST /api/parse-syllabus: Parse syllabus with gemini-3.1-flash-lite
 // Supports text, single or multiple PDF documents, or combined input
@@ -226,12 +254,9 @@ CRITICAL INSTRUCTIONS:
       });
     }
 
-    return res.status(500).json({
-      error: error.message || 'Failed to parse syllabus material. Please check your files or try again.',
-    });
+    return sendAiError(res, error, 'Failed to parse syllabus material. Please check your files or try again.');
   }
 });
-
 // -------------------------------------------------------------
 // In-memory cache for synthesized course audio briefs
 // -------------------------------------------------------------
@@ -590,13 +615,10 @@ CRITICAL INSTRUCTIONS:
       timeWarning: parsedData.timeWarning?.isTooShort ? parsedData.timeWarning : null,
     });
   } catch (error: any) {
-    console.error('Error in /api/generate-plan:', error);
-    return res.status(500).json({
-      error: error.message || 'Failed to generate study plan.',
-    });
+        console.error('Error in /api/generate-plan:', error);
+    return sendAiError(res, error, 'Failed to generate study plan. Please try again.');
   }
 });
-
 // -------------------------------------------------------------
 // POST /api/grade-focus: Grade effort focus analysis using gemini-3.1-flash-lite
 // -------------------------------------------------------------
@@ -763,13 +785,243 @@ MANDATORY RULES:
 
     return res.json(parsedData);
   } catch (error: any) {
-    console.error('Error in /api/grade-focus:', error);
-    return res.status(500).json({
-      error: error.message || 'Grade focus analysis failed.',
-    });
+        console.error('Error in /api/grade-focus:', error);
+    return sendAiError(res, error, 'Grade analysis failed. Please try again.');
   }
 });
+// -------------------------------------------------------------
+// POST /api/exam-prep: Generate Practice Questions or Study Guide
+// Route-specific body-size limit raised to 5mb with readable JSON error handling
+// -------------------------------------------------------------
+function cleanSource(text: string): string {
+  return text
+    .replace(/^\s*---\s*\[[^\]]*\]\s*---\s*$/gm, '')
+    .replace(/\[Page \d+\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
+const examPrepJsonParser = express.json({ limit: '1mb' });
+
+app.post(
+  '/api/exam-prep',
+  (req: Request, res: Response, next: NextFunction) => {
+    examPrepJsonParser(req, res, (err: any) => {
+      if (err) {
+        if (err.type === 'entity.too.large' || err.status === 413) {
+          return res.status(413).json({
+            error: 'The request payload is too large. Combined text must be under 1 MB (max 150,000 characters).',
+            code: 'payload_too_large',
+          });
+        }
+        return res.status(400).json({ error: 'Invalid JSON request payload.' });
+      }
+      next();
+    });
+  },
+  requireStudentAiAuthAndRateLimit,
+  async (req: Request, res: Response) => {
+    try {
+      const studentId = (req as any).studentId;
+      if (studentId) {
+        const limitCheck = checkAndRecordExamPrepLimit(studentId);
+        if (!limitCheck.allowed) {
+          if (limitCheck.retryAfterSeconds) {
+            res.setHeader('Retry-After', String(limitCheck.retryAfterSeconds));
+          }
+          return res.status(429).json({
+            error: limitCheck.message,
+            code: 'rate_limited',
+            retryAfterSeconds: limitCheck.retryAfterSeconds,
+          });
+        }
+      }
+
+      const {
+        courseName,
+        examTitle,
+        examDate,
+        mode = 'questions',
+        notes = '',
+        extractedText = '',
+        questionCount = 10,
+        questionMix = 'mixed',
+      } = req.body;
+
+      const hasNotes = typeof notes === 'string' && notes.trim().length > 0;
+      const hasExtractedText = typeof extractedText === 'string' && extractedText.trim().length > 0;
+
+      if (!hasNotes && !hasExtractedText) {
+        return res.status(400).json({
+          error: 'Please paste your lecture notes or select a PDF document with readable text to generate prep.',
+        });
+      }
+
+      const combinedTextLength = (hasNotes ? notes.length : 0) + (hasExtractedText ? extractedText.length : 0);
+      if (combinedTextLength > 150000) {
+        return res.status(400).json({
+          error: `Combined text (pasted notes and extracted PDF text) exceeds the maximum allowed length of 150,000 characters (current length: ${combinedTextLength.toLocaleString()}). Please trim slightly or reduce page ranges.`,
+        });
+      }
+
+      const sanitizedCount = Math.min(15, Math.max(5, Number(questionCount) || 10));
+      const targetMode = mode === 'guide' ? 'guide' : 'questions';
+
+      const mixText =
+        questionMix === 'multiple_choice'
+          ? '100% Multiple Choice'
+          : questionMix === 'short_answer'
+          ? '100% Short Answer'
+          : 'Balanced mix of Multiple Choice and conceptual Short Answer';
+
+      const materialsBlock = [
+        hasExtractedText ? `STUDY MATERIALS:\n---\n${cleanSource(extractedText)}\n---` : '',
+        hasNotes ? `PASTED STUDENT STUDY NOTES:\n---\n${notes.trim()}\n---` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const taskBlock =
+        targetMode === 'questions'
+          ? `PRACTICE QUESTIONS INSTRUCTIONS:
+- Generate exactly ${sanitizedCount} high-yield exam practice questions.
+- Question style mix: ${mixText}.
+- For each question:
+  - id: unique string like "q1", "q2", etc.
+  - type: "multiple_choice" or "short_answer"
+  - question: clear, rigorous exam-style prompt testing understanding or application of the materials
+  - options: if multiple_choice, exactly 4 distinct options formatted as ["A) ...", "B) ...", "C) ...", "D) ..."]. If short_answer, empty array [].
+  - correctAnswer: if multiple_choice, the letter and text (e.g. "B) ..."). If short_answer, a concise, 1-2 sentence model answer key directly supported by the materials.
+  - explanation: clear explanation of why this answer is correct, referencing the relevant concept.`
+          : `STUDY GUIDE INSTRUCTIONS:
+- Generate a structured study guide synthesizing the student materials:
+  - overview: 2-3 sentence executive summary of the core themes in these materials.
+  - likelyTopics: 3 to 6 high-probability exam topics deduced from the emphasis in the materials.
+  - keyTerms: 4 to 12 crucial technical terms or definitions extracted directly from the materials.
+  - sections: 3 to 6 logical thematic sections. Each section must have a clear heading, a 2-3 sentence summary, and 3-5 bullet points highlighting critical testable facts or rules.`;
+
+      const prompt = `You are an expert college academic tutor and exam preparation specialist.
+${WRITING_STYLE}
+
+EXAM CONTEXT:
+- Course: ${courseName || 'College Course'}
+- Exam Title: ${examTitle || 'Upcoming Exam'}
+- Exam Date: ${examDate || 'Upcoming'}
+- Target Mode: ${targetMode === 'guide' ? 'Study Guide' : 'Practice Questions'}
+
+${materialsBlock}
+
+CRITICAL INSTRUCTIONS:
+1. STRICT MATERIAL FIDELITY: Base all generated content SOLELY on the concepts, definitions, examples, and topics present in the student's materials above.
+2. NO INVENTED FACTS: Do not invent formulas, dates, theories, or historical facts that are not explicitly stated in or directly deducible from the provided materials.
+3. THIN CONTENT DETECTION: If the provided materials are too sparse, fragmented, vague, or lack sufficient academic substance to create a meaningful study guide or questions (e.g. only 2-3 words, placeholder text, or disconnected fragments), you MUST set "notesTooThin": true, provide clear and encouraging feedback in "notesFeedback" indicating what additional topics or chapters need to be uploaded or pasted, and return empty questions / study guide.
+4. If the materials have sufficient content, set "notesTooThin": false.
+5. The source text may contain spacing errors (split words, stray spaces, broken line breaks). Silently repair them. Never copy raw source text, fragments, or spacing errors into questions, answer choices, or explanations.
+6. Never mention file names, page markers, "Uploaded Document", or "PDF". Refer only to the course topic.
+7. Every multiple-choice option must be a short, clean phrase you write yourself (under 20 words). Exactly one option is correct and the other three are plausible but wrong. Write every question in your own words.
+8. Study guide key terms, definitions, summaries and bullet points must be clean, readable sentences in your own words.
+
+${taskBlock}
+`;
+
+      let parsedData: any = null;
+
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: [{ text: prompt }],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                notesTooThin: { type: Type.BOOLEAN },
+                notesFeedback: { type: Type.STRING },
+                questions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      type: { type: Type.STRING },
+                      question: { type: Type.STRING },
+                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      correctAnswer: { type: Type.STRING },
+                      explanation: { type: Type.STRING },
+                    },
+                    required: ['id', 'type', 'question', 'correctAnswer', 'explanation'],
+                  },
+                },
+                studyGuide: {
+                  type: Type.OBJECT,
+                  properties: {
+                    overview: { type: Type.STRING },
+                    likelyTopics: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    keyTerms: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          term: { type: Type.STRING },
+                          definition: { type: Type.STRING },
+                        },
+                        required: ['term', 'definition'],
+                      },
+                    },
+                    sections: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          heading: { type: Type.STRING },
+                          summary: { type: Type.STRING },
+                          bulletPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        },
+                        required: ['heading', 'summary'],
+                      },
+                    },
+                  },
+                },
+              },
+              required: ['notesTooThin'],
+            },
+          },
+        });
+
+        parsedData = JSON.parse(response.text?.trim() || '{}');
+      } catch (aiErr: any) {
+        console.error('Gemini generateContent for /api/exam-prep failed:', aiErr?.message || aiErr);
+        return res.status(502).json({
+          error: 'The AI service could not generate your prep right now. Please try again in a minute.',
+        });
+      }
+
+      if (
+        !parsedData ||
+        (parsedData.notesTooThin !== true && !parsedData.questions?.length && !parsedData.studyGuide)
+      ) {
+        console.warn('Gemini returned an empty exam prep structure.');
+        return res.status(502).json({
+          error: 'The AI returned an empty result. Please try again.',
+        });
+      }
+
+      return res.json({
+        mode: targetMode,
+        notesTooThin: !!parsedData.notesTooThin,
+        notesFeedback: parsedData.notesFeedback || null,
+        questions: Array.isArray(parsedData.questions) ? parsedData.questions : [],
+        studyGuide: parsedData.studyGuide || null,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('Error in /api/exam-prep:', error);
+      return res.status(500).json({
+        error: error?.message || 'Exam prep generation failed.',
+      });
+    }
+  }
+);
 // -------------------------------------------------------------
 // WebSocket Server for Live API: gemini-3.8-live
 // -------------------------------------------------------------
@@ -953,6 +1205,17 @@ wss.on('connection', async (clientWs: WebSocket, req: http.IncomingMessage) => {
       // Ignore cleanup error
     }
   });
+});
+
+// Global error middleware to catch 413 payload too large and return readable JSON
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({
+      error: 'The uploaded file payload is too large. Please remove a file or attach smaller PDFs (max 12 MB total raw size).',
+      code: 'payload_too_large',
+    });
+  }
+  next(err);
 });
 
 // -------------------------------------------------------------

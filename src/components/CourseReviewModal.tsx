@@ -47,6 +47,9 @@ const COLOR_OPTIONS = [
   { label: 'Indigo', value: '#6366F1' },
 ];
 
+// An empty string means "None": the course card shows no color bar
+const NO_COLOR = '';
+
 export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
   isOpen,
   onClose,
@@ -60,7 +63,8 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
   const [courseCode, setCourseCode] = useState(initialData.code || '');
   const [instructor, setInstructor] = useState(initialData.instructor || '');
   const [term, setTerm] = useState(initialData.term || 'Fall 2026');
-  const [selectedColor, setSelectedColor] = useState(initialData.color || '#3B82F6');
+  // '' = None. A missing color (older courses, new syllabus imports) defaults to blue.
+  const [selectedColor, setSelectedColor] = useState<string>(initialData.color ?? '#3B82F6');
 
   // Categories list
   const [categories, setCategories] = useState<GradedCategory[]>(
@@ -250,7 +254,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       code: courseCode.trim() || null,
       instructor: instructor.trim() || null,
       term: term.trim() || 'Fall 2026',
-      color: selectedColor,
+      color: selectedColor, // '' when None is chosen (stored as an empty string, never undefined)
       rawSyllabus: initialData.rawSyllabus,
       categories: categories.filter((c) => c.name.trim().length > 0),
       deadlines: deadlines.filter((d) => d.title.trim().length > 0),
@@ -269,7 +273,10 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selectedColor }} />
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: selectedColor === NO_COLOR ? '#94a3b8' : selectedColor }}
+              />
               <h2 id="review-course-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                 {isEditingExisting ? 'Edit Course & Syllabus Data' : 'Review & Verify Extracted Syllabus'}
               </h2>
@@ -404,11 +411,25 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Color Tag:</span>
                 <div className="flex items-center gap-1.5">
+                  {/* None: removes the color bar from the course card */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedColor(NO_COLOR)}
+                    aria-pressed={selectedColor === NO_COLOR}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 transition-transform ${
+                      selectedColor === NO_COLOR ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-950' : 'opacity-70 hover:opacity-100'
+                    }`}
+                    title="None (no color bar)"
+                    aria-label="No color"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                   {COLOR_OPTIONS.map((c) => (
                     <button
                       key={c.value}
                       type="button"
                       onClick={() => setSelectedColor(c.value)}
+                      aria-pressed={selectedColor === c.value}
                       className={`w-6 h-6 rounded-full transition-transform ${
                         selectedColor === c.value ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-slate-950' : 'opacity-70 hover:opacity-100'
                       }`}

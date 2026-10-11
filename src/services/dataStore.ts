@@ -1,4 +1,4 @@
-import { Course, GradedCategory, Deadline, DeadlineType, AssignmentPlan, Milestone } from '../types/academic';
+import { Course, GradedCategory, Deadline, DeadlineType, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
 import { NotificationSettings, NotificationRule, NotificationRuleScope, ReminderLeadTime } from '../types/notifications';
 import { calendarSyncService, registerDataStoreHooks } from './calendarSyncService';
 import { 
@@ -19,6 +19,7 @@ const STORAGE_KEY = 'semester_command_center_courses_v1';
 const PLANS_STORAGE_KEY = 'semester_command_center_plans_v1';
 const NOTIFICATION_SETTINGS_STORAGE_KEY = 'semester_command_center_notification_settings_v1';
 const NOTIFICATION_RULES_STORAGE_KEY = 'semester_command_center_notification_rules_v1';
+const EXAM_PREPS_STORAGE_KEY = 'semester_command_center_exam_preps_v1';
 
 // Initial sample assignment plan for collegiate demo
 const INITIAL_PLANS: AssignmentPlan[] = [];
@@ -2449,6 +2450,123 @@ export const dataStore = {
         throw err;
       }
     });
+  },
+
+  /**
+   * Saves an exam prep study guide or practice question set under the signed-in user's Firestore path:
+   * /users/{userId}/examPreps/{prepId}
+   */
+  async saveExamPrep(prep: ExamPrepData): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    const sanitizedId = prep.id.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+    const safePrep: ExamPrepData = {
+      ...prep,
+      id: sanitizedId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Save to local storage for fast cached access
+    try {
+      const stored = localStorage.getItem(EXAM_PREPS_STORAGE_KEY);
+      const allPreps: Record<string, ExamPrepData> = stored ? JSON.parse(stored) : {};
+      allPreps[safePrep.id] = safePrep;
+      localStorage.setItem(EXAM_PREPS_STORAGE_KEY, JSON.stringify(allPreps));
+    } catch {
+      // LocalStorage error non-fatal
+    }
+
+    if (!userId) return;
+
+    const path = `users/${userId}/examPreps/${safePrep.id}`;
+    try {
+      await setDoc(doc(db, 'users', userId, 'examPreps', safePrep.id), safePrep);
+    } catch (err) {
+      console.error('Failed to save exam prep to Firestore:', err);
+      handleFirestoreError(err, OperationType.WRITE, path);
+      throw err;
+    }
+  },
+
+  /**
+   * Retrieves a single saved exam prep by ID
+   */
+  async getExamPrep(prepId: string): Promise<ExamPrepData | null> {
+    const sanitizedId = prepId.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+    const userId = auth.currentUser?.uid;
+
+    if (!userId) {
+      try {
+        const stored = localStorage.getItem(EXAM_PREPS_STORAGE_KEY);
+        if (stored) {
+          const allPreps: Record<string, ExamPrepData> = JSON.parse(stored);
+          return allPreps[sanitizedId] || null;
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }
+
+    const path = `users/${userId}/examPreps/${sanitizedId}`;
+    try {
+      const snap = await getDoc(doc(db, 'users', userId, 'examPreps', sanitizedId));
+      if (snap.exists()) {
+        const data = snap.data() as ExamPrepData;
+        return data;
+      }
+      // Fallback to local storage if Firestore doc doesn't exist yet
+      const stored = localStorage.getItem(EXAM_PREPS_STORAGE_KEY);
+      if (stored) {
+        const allPreps: Record<string, ExamPrepData> = JSON.parse(stored);
+        return allPreps[sanitizedId] || null;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to load exam prep from Firestore:', err);
+      handleFirestoreError(err, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  /**
+   * Loads all saved exam preps for the signed-in user, mapped by prepId
+   */
+  async getAllExamPreps(): Promise<Record<string, ExamPrepData>> {
+    const userId = auth.currentUser?.uid;
+    const map: Record<string, ExamPrepData> = {};
+
+    // Seed with local storage
+    try {
+      const stored = localStorage.getItem(EXAM_PREPS_STORAGE_KEY);
+      if (stored) {
+        Object.assign(map, JSON.parse(stored));
+      }
+    } catch {
+      // Ignore
+    }
+
+    if (!userId) return map;
+
+    const path = `users/${userId}/examPreps`;
+    try {
+      const snap = await getDocs(collection(db, 'users', userId, 'examPreps'));
+      snap.forEach((d) => {
+        const data = d.data() as ExamPrepData;
+        map[data.id] = data;
+      });
+
+      // Update local storage cache
+      try {
+        localStorage.setItem(EXAM_PREPS_STORAGE_KEY, JSON.stringify(map));
+      } catch {
+        // Ignore
+      }
+      return map;
+    } catch (err) {
+      console.error('Failed to load all exam preps from Firestore:', err);
+      handleFirestoreError(err, OperationType.GET, path);
+      return map;
+    }
   },
 };
 

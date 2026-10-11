@@ -1,5 +1,23 @@
-import { Course, ExtractedSyllabusData, AcademicSearchResult, SemesterAnalysis, GradeFocusAnalysis } from '../types/academic';
+import { 
+  Course, 
+  ExtractedSyllabusData, 
+  AcademicSearchResult, 
+  SemesterAnalysis, 
+  GradeFocusAnalysis,
+  ExamPrepMode,
+  PracticeQuestion,
+  StudyGuideData,
+} from '../types/academic';
 import { auth } from './firebase';
+
+export interface ExamPrepApiResponse {
+  mode: ExamPrepMode;
+  notesTooThin: boolean;
+  notesFeedback: string | null;
+  questions: PracticeQuestion[];
+  studyGuide: StudyGuideData | null;
+  generatedAt: string;
+}
 
 export interface AudioBriefingResponse {
   audio?: string | null; // base64 encoded wav
@@ -12,6 +30,13 @@ export interface AudioBriefingResponse {
  * Helper to retrieve authentication headers containing the signed-in student's Firebase ID token.
  */
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (typeof auth.authStateReady === 'function') {
+    try {
+      await auth.authStateReady();
+    } catch {
+      // Continue if auth ready check errors
+    }
+  }
   const token = await auth.currentUser?.getIdToken();
   if (!token) {
     throw new Error('Please sign in to use Apodict AI features.');
@@ -220,5 +245,65 @@ export const geminiClient = {
     }
 
     return await response.json();
+  },
+
+  /**
+   * Generate exam practice questions or study guide from pasted notes or client-extracted PDF text using Gemini 3.1 Flash Lite
+   */
+  async generateExamPrep(params: {
+    courseName: string;
+    examTitle: string;
+    examDate?: string | null;
+    mode: ExamPrepMode;
+    notes?: string;
+    extractedText?: string;
+    pdfFiles?: Array<{ name: string; pageCount?: number; pageRange?: string }>;
+    questionCount?: number;
+    questionMix?: 'mixed' | 'multiple_choice' | 'short_answer';
+  }): Promise<ExamPrepApiResponse> {
+    const headers = await getAuthHeaders();
+    const response = await fetch('/api/exam-prep', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        courseName: params.courseName.trim(),
+        examTitle: params.examTitle.trim(),
+        examDate: params.examDate || '',
+        mode: params.mode,
+        notes: typeof params.notes === 'string' ? params.notes : '',
+        extractedText: typeof params.extractedText === 'string' ? params.extractedText : '',
+        pdfFiles: params.pdfFiles || [],
+        questionCount: params.questionCount || 10,
+        questionMix: params.questionMix || 'mixed',
+      }),
+    });
+
+        const rawBody = await response.text();
+    let payload: any = null;
+    try {
+      payload = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      // body was not JSON
+    }
+
+    if (!response.ok) {
+      if (response.status === 413) {
+        throw new Error(
+          payload?.error ||
+            'The request payload exceeds the server limit of 1 MB. Combined text must be under 150,000 characters. Please trim notes or select a smaller page range.'
+        );
+      }
+      throw new Error(
+        payload?.error || `Exam prep generation failed (${response.status}). ${rawBody.slice(0, 120)}`
+      );
+    }
+
+    if (!payload) {
+      throw new Error(
+        `The server returned an unexpected response (${response.status}): ${rawBody.slice(0, 120)}`
+      );
+    }
+
+    return payload;
   },
 };

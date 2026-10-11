@@ -241,6 +241,85 @@
           "description": "Error details if status is error"
         }
       }
+    },
+    "ExamPrep": {
+      "title": "ExamPrep",
+      "description": "Saved exam study guides and practice questions linked to course exam deadlines",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the exam prep (e.g. courseId_examId)",
+          "maxLength": 128
+        },
+        "courseId": {
+          "type": "string",
+          "description": "Associated course ID",
+          "maxLength": 128
+        },
+        "courseName": {
+          "type": "string",
+          "description": "Associated course name",
+          "maxLength": 200
+        },
+        "examId": {
+          "type": "string",
+          "description": "Associated exam deadline ID",
+          "maxLength": 128
+        },
+        "examTitle": {
+          "type": "string",
+          "description": "Exam deadline title",
+          "maxLength": 200
+        },
+        "examDate": {
+          "type": "string",
+          "description": "Exam deadline date string",
+          "maxLength": 40
+        },
+        "mode": {
+          "type": "string",
+          "description": "Prep mode: questions or guide",
+          "maxLength": 20
+        },
+        "notes": {
+          "type": "string",
+          "description": "Pasted student lecture or review notes",
+          "maxLength": 25000
+        },
+        "pdfNames": {
+          "type": "array",
+          "description": "Names of uploaded PDF documents used for prep"
+        },
+        "notesTooThin": {
+          "type": "boolean",
+          "description": "Whether notes had insufficient detail"
+        },
+        "notesFeedback": {
+          "type": "string",
+          "description": "Helpful feedback if notes were too thin",
+          "maxLength": 2000
+        },
+        "questions": {
+          "type": "array",
+          "description": "Generated practice questions with options, correct answer, and explanations"
+        },
+        "studyGuide": {
+          "type": "object",
+          "description": "Structured study guide with headings, key terms, and likely topics"
+        },
+        "generatedAt": {
+          "type": "string",
+          "description": "Generation timestamp ISO string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string",
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "courseId", "examId", "examTitle"]
     }
   },
   "firestore": {
@@ -263,6 +342,10 @@
     "/users/{userId}/calendarSync/{syncId}": {
       "schema": "CalendarSyncConfig",
       "description": "Student Google Calendar sync configuration"
+    },
+    "/users/{userId}/examPreps/{prepId}": {
+      "schema": "ExamPrep",
+      "description": "Student saved exam preparation guides and practice question sets"
     }
   }
 }
