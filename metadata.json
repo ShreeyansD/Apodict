@@ -1,0 +1,7 @@
+{
+  "name": "Apodict",
+  "description": "Smart academic dashboard for college students to parse syllabi with Gemini AI, track course weights, manage deadlines, and get voice and research assistance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

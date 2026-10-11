@@ -1,0 +1,268 @@
+{
+  "entities": {
+    "Course": {
+      "title": "Course",
+      "description": "An academic course with grading categories, assignment deadlines, item assignments, exclusions, and display order",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the course",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the course",
+          "maxLength": 200
+        },
+        "code": {
+          "type": "string",
+          "description": "Course code e.g. CS 106B",
+          "maxLength": 50
+        },
+        "instructor": {
+          "type": "string",
+          "description": "Instructor name",
+          "maxLength": 100
+        },
+        "term": {
+          "type": "string",
+          "description": "Academic term e.g. Fall 2026",
+          "maxLength": 50
+        },
+        "color": {
+          "type": "string",
+          "description": "Display color tag for course",
+          "maxLength": 30
+        },
+        "rawSyllabus": {
+          "type": "string",
+          "description": "Raw syllabus markdown or text",
+          "maxLength": 100000
+        },
+        "targetGrade": {
+          "type": "number",
+          "description": "Target percentage grade"
+        },
+        "order": {
+          "type": "number",
+          "description": "Sort order of the course"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp ISO string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string",
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "name"]
+    },
+    "AssignmentPlan": {
+      "title": "AssignmentPlan",
+      "description": "A backward assignment roadmap with milestones, time estimates, and buffer days",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the assignment plan",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the assignment plan",
+          "maxLength": 200
+        },
+        "courseName": {
+          "type": "string",
+          "description": "Associated course name",
+          "maxLength": 200
+        },
+        "courseId": {
+          "type": "string",
+          "description": "Associated course id",
+          "maxLength": 128
+        },
+        "promptText": {
+          "type": "string",
+          "description": "Prompt or syllabus text used to generate plan",
+          "maxLength": 10000
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Target due date",
+          "maxLength": 20
+        },
+        "hoursPerDay": {
+          "type": "number",
+          "description": "Target daily study hours"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp ISO string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string",
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "title", "dueDate"]
+    },
+    "NotificationSettings": {
+      "title": "NotificationSettings",
+      "description": "Student notification settings and phone verification state",
+      "type": "object",
+      "properties": {
+        "phoneNumber": {
+          "type": "string",
+          "description": "International E.164 phone number",
+          "maxLength": 40
+        },
+        "countryCode": {
+          "type": "string",
+          "description": "Selected country ISO code",
+          "maxLength": 10
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Whether phone has been verified"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "User time zone",
+          "maxLength": 100
+        },
+        "defaultReminderTime": {
+          "type": "string",
+          "description": "Default reminder time of day (HH:mm)",
+          "maxLength": 10
+        },
+        "channel": {
+          "type": "string",
+          "description": "Notification delivery channel",
+          "maxLength": 20
+        },
+        "consent": {
+          "type": "boolean",
+          "description": "SMS messaging consent agreement"
+        },
+        "consentGivenAt": {
+          "type": "string",
+          "description": "Consent timestamp ISO string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string",
+          "maxLength": 40
+        }
+      }
+    },
+    "NotificationRule": {
+      "title": "NotificationRule",
+      "description": "Configured deadline reminder rule with scope and lead times",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the reminder rule",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Rule label",
+          "maxLength": 200
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the rule is active"
+        },
+        "customReminderTime": {
+          "type": "string",
+          "description": "Custom reminder time of day (HH:mm) if overridden",
+          "maxLength": 10
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp ISO string",
+          "maxLength": 40
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string",
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "name"]
+    },
+    "CalendarSyncConfig": {
+      "title": "CalendarSyncConfig",
+      "description": "Student Google Calendar synchronization configuration and preferences",
+      "type": "object",
+      "properties": {
+        "calendarId": {
+          "type": "string",
+          "description": "Dedicated Apodict Google Calendar ID",
+          "maxLength": 256
+        },
+        "accountEmail": {
+          "type": "string",
+          "description": "Connected Google account email",
+          "maxLength": 200
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last successful sync",
+          "maxLength": 40
+        },
+        "courseToggles": {
+          "type": "object",
+          "description": "Map of course ID to active sync boolean"
+        },
+        "includeMilestones": {
+          "type": "boolean",
+          "description": "Whether study plan milestones are synced to calendar"
+        },
+        "reminderMinutes": {
+          "type": "number",
+          "description": "Popup reminder minutes before all-day event (900 for 1 day, 2340 for 2 days, 9540 for 1 week)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current synchronization status"
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Error details if status is error"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Courses belonging to a specific student"
+    },
+    "/users/{userId}/plans/{planId}": {
+      "schema": "AssignmentPlan",
+      "description": "Assignment roadmap plans belonging to a specific student"
+    },
+    "/users/{userId}/notificationSettings/{settingId}": {
+      "schema": "NotificationSettings",
+      "description": "Student notification settings"
+    },
+    "/users/{userId}/notificationRules/{ruleId}": {
+      "schema": "NotificationRule",
+      "description": "Student deadline reminder rules"
+    },
+    "/users/{userId}/calendarSync/{syncId}": {
+      "schema": "CalendarSyncConfig",
+      "description": "Student Google Calendar sync configuration"
+    }
+  }
+}

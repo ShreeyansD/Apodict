@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-.]+$');
+    }
+
+    // Connection test endpoint used by Firebase skill testConnection()
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // Student accounts, courses, plans, settings, and reminder rules:
+    // Signed-in students can read and write only their own documents
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /courses/{courseId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(courseId);
+      }
+
+      match /plans/{planId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(planId);
+      }
+
+      match /notificationSettings/{settingId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(settingId);
+      }
+
+      match /notificationRules/{ruleId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(ruleId);
+      }
+
+      match /calendarSync/{syncId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId) && isValidId(syncId);
+      }
+    }
+  }
+}
+

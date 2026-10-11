@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apodict</title>
+    <meta name="description" content="Smart academic dashboard for college students to parse syllabi with Gemini AI, track course weights, manage deadlines, and get voice and research assistance." />
+    <meta property="og:title" content="Apodict" />
+    <meta property="og:description" content="Smart academic dashboard for college students to parse syllabi with Gemini AI, track course weights, manage deadlines, and get voice and research assistance." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Gracefully prevent Vite dev client websocket connection errors from bubbling to runner
+      window.addEventListener('error', function(event) {
+        var msg = (event && event.message) || '';
+        var filename = (event && event.filename) || '';
+        var stack = (event && event.error && event.error.stack) || '';
+        if (
+          msg.indexOf('WebSocket') !== -1 ||
+          filename.indexOf('@vite/client') !== -1 ||
+          stack.indexOf('createWebSocketModuleRunnerTransport') !== -1 ||
+          stack.indexOf('@vite/client') !== -1
+        ) {
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(event) {
+        var reasonMsg = (event && event.reason && (event.reason.message || event.reason.stack || '')) || '';
+        if (
+          reasonMsg.indexOf('WebSocket') !== -1 ||
+          reasonMsg.indexOf('createWebSocketModuleRunnerTransport') !== -1 ||
+          reasonMsg.indexOf('@vite/client') !== -1
+        ) {
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

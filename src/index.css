@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root:not(.dark) {
+  /* Surfaces */
+  --app-bg: #e9f0fa;
+  --surface-card: #f7faff;
+  --surface-secondary: #eef4fc;
+  --surface-input: #fbfdff;
+  --surface-hover: #e3ecf9;
+  --surface-selected: #dbe7f8;
+  --border-subtle: #cfdcee;
+  --border-strong: #b8c7de;
+  --track-unfilled: #dbe6f5;
+
+  /* Text */
+  --text-primary: #0f1b33;
+  --text-secondary: #3b4d69;
+  --text-muted: #526580;
+  --text-placeholder: #5b6b84;
+  --text-link: #1d4ed8;
+
+  /* Light-mode color overrides for Tailwind palette tokens */
+  --color-white: #f7faff;
+  --color-slate-50: #e9f0fa;
+  --color-slate-100: #eef4fc;
+  --color-slate-200: #cfdcee;
+  --color-slate-300: #b8c7de;
+  --color-slate-400: #526580;
+  --color-slate-500: #526580;
+  --color-slate-600: #3b4d69;
+  --color-slate-700: #3b4d69;
+  --color-slate-800: #0f1b33;
+  --color-slate-900: #0f1b33;
+  --color-slate-950: #0f1b33;
+
+  --color-gray-50: #e9f0fa;
+  --color-gray-100: #eef4fc;
+  --color-gray-200: #cfdcee;
+  --color-gray-300: #b8c7de;
+  --color-gray-400: #526580;
+  --color-gray-500: #526580;
+  --color-gray-600: #3b4d69;
+  --color-gray-700: #3b4d69;
+  --color-gray-800: #0f1b33;
+  --color-gray-900: #0f1b33;
+
+  --color-zinc-50: #e9f0fa;
+  --color-zinc-100: #eef4fc;
+  --color-zinc-200: #cfdcee;
+  --color-zinc-300: #b8c7de;
+  --color-zinc-400: #526580;
+  --color-zinc-500: #526580;
+  --color-zinc-600: #3b4d69;
+  --color-zinc-700: #3b4d69;
+  --color-zinc-800: #0f1b33;
+  --color-zinc-900: #0f1b33;
+
+  /* Soft and blue-gray shadows: rgba(30, 58, 110, 0.08) to 0.12 in place of black */
+  --shadow-xs: 0 1px 2px 0 rgba(30, 58, 110, 0.08);
+  --shadow-sm: 0 1px 3px 0 rgba(30, 58, 110, 0.08), 0 1px 2px -1px rgba(30, 58, 110, 0.08);
+  --shadow-md: 0 4px 6px -1px rgba(30, 58, 110, 0.10), 0 2px 4px -2px rgba(30, 58, 110, 0.08);
+  --shadow-lg: 0 10px 15px -3px rgba(30, 58, 110, 0.12), 0 4px 6px -4px rgba(30, 58, 110, 0.08);
+  --shadow-xl: 0 20px 25px -5px rgba(30, 58, 110, 0.12), 0 8px 10px -6px rgba(30, 58, 110, 0.08);
+  --shadow-2xl: 0 25px 50px -12px rgba(30, 58, 110, 0.12);
+}
+
+:root.dark {
+  /* Exactly preserved Dark Mode colors */
+  --color-white: #ffffff;
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply antialiased min-h-screen text-[#0f1b33] bg-[#e9f0fa] dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  /* Text inputs, selects, and text areas in light mode: #fbfdff */
+  :root:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  :root:not(.dark) select,
+  :root:not(.dark) textarea {
+    background-color: #fbfdff !important;
+    border-color: #b8c7de;
+    color: #0f1b33;
+  }
+
+  :root:not(.dark) input::placeholder,
+  :root:not(.dark) textarea::placeholder {
+    color: #5b6b84;
+  }
+}
