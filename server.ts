@@ -28,6 +28,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+   // Serve Firebase's sign-in helper pages from our own domain so Google shows it
+app.use(
+  createProxyMiddleware({
+    pathFilter: '/__/auth',
+    target: 'https://gen-lang-client-0396426716.firebaseapp.com',
+    changeOrigin: true,
+  })
+);
 const server = http.createServer(app);
 
 // Standard body parser (does not apply to /api/exam-prep which has its own 5mb route parser)
