@@ -22,8 +22,12 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
+// Use our own domain for sign-in only on the live site; everywhere else keep the default
+const authDomain =
+  typeof window !== 'undefined' && window.location.hostname === 'apodict.app'
+    ? 'apodict.app'
+    : (firebaseConfig as any).authDomain;
+const app = initializeApp({ ...firebaseConfig, authDomain });
 
 // Initialize Firestore (with explicit database ID per skill requirement)
 const databaseId = (firebaseConfig as any).firestoreDatabaseId || 'ai-studio-semestercommandc-c178a31e-a74c-4de6-9d81-3dcd800ef70e';
