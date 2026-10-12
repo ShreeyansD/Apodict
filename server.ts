@@ -14,6 +14,7 @@ import {
   AI_RATE_LIMITS,
 } from './aiProtection.ts';
 import { generateFallbackExamPrep } from './examPrepFallback.ts';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 // Re-export AI_RATE_LIMITS so it is configured in one central place
 export { AI_RATE_LIMITS };
