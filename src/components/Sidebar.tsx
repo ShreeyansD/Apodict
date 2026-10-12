@@ -11,7 +11,8 @@ import {
   HardDrive,
   Bell,
   Calendar,
-  FileQuestion
+  FileQuestion,
+  Smartphone
 } from 'lucide-react';
 import { User } from '../services/firebase';
 
@@ -24,6 +25,7 @@ interface SidebarProps {
   totalDeadlines: number;
   onOpenLiveVoice: () => void;
   onOpenBackupRestore: () => void;
+  onOpenInstallGuide: () => void;
   onOpenDeleteAccount: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
@@ -53,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalDeadlines,
   onOpenLiveVoice,
   onOpenBackupRestore,
+  onOpenInstallGuide,
   onOpenDeleteAccount: _onOpenDeleteAccount,
   isMobileOpen,
   setIsMobileOpen,
@@ -93,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { key: 'calendar', tab: 'calendar', label: 'Calendar', icon: Calendar },
         { key: 'notifications', tab: 'notifications', label: 'Reminders', icon: Bell },
         { key: 'backup', action: onOpenBackupRestore, label: 'Backup & Restore', icon: HardDrive },
+        { key: 'install', action: onOpenInstallGuide, label: 'Install to Home Screen', icon: Smartphone },
       ],
     },
   ];

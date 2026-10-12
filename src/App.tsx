@@ -24,6 +24,7 @@ import { AudioBriefingModal } from './components/AudioBriefingModal';
 import { AcademicSearchModal } from './components/AcademicSearchModal';
 import { LiveVoiceAdvisorModal } from './components/LiveVoiceAdvisorModal';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
+import { InstallGuideModal } from './components/InstallGuideModal';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
 import { SignInScreen } from './components/SignInScreen';
 import { CollisionMap } from './components/CollisionMap';
@@ -85,6 +86,7 @@ export default function App() {
   const [searchModalCourse, setSearchModalCourse] = useState<Course | null>(null);
   const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState(false);
   const [isBackupRestoreOpen, setIsBackupRestoreOpen] = useState(false);
+  const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [deletionConfirmation, setDeletionConfirmation] = useState<string | null>(null);
   
@@ -481,6 +483,7 @@ export default function App() {
         totalDeadlines={pendingDeadlines}
         onOpenLiveVoice={() => setIsLiveVoiceOpen(true)}
         onOpenBackupRestore={() => setIsBackupRestoreOpen(true)}
+        onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
         onOpenDeleteAccount={() => setIsDeleteAccountOpen(true)}
         isMobileOpen={isMobileNavOpen}
         setIsMobileOpen={setIsMobileNavOpen}
@@ -914,6 +917,11 @@ export default function App() {
           setCourses(updated);
           showToast('Data restored successfully!');
         }}
+      />
+    
+      <InstallGuideModal
+        isOpen={isInstallGuideOpen}
+        onClose={() => setIsInstallGuideOpen(false)}
       />
     
       <DeleteAccountModal
