@@ -40,6 +40,7 @@ import {
   onAuthStateChanged
 } from '../services/firebase';
 import { dataStore, DEFAULT_PUSH_SETTINGS } from '../services/dataStore';
+import { computeReminderInstant, formatReminderInstantLocal } from '../utils/reminderInstant';
 
 const PUSH_VAPID_KEY = 'BI3Pp0TuX3nDLT1Uvp3P_VgK8Ev7rXIj6I_3iWKfczc0xzAcOtrQ5JhoPOSdq7KW46_nXwnZrE1c5g-iLljQyHM';
 const LOCAL_STORAGE_TOKEN_KEY = 'apodict_current_push_token';
@@ -91,54 +92,6 @@ function formatTimeAgo(date: Date): string {
   return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
-/**
- * Calculates the exact UTC Date representing a specific year, month, day,
- * hour, and minute interpreted in a target IANA time zone.
- */
-function getZonedTargetDate(
-  year: number,
-  month: number, // 1-12
-  day: number,
-  hours: number,
-  minutes: number,
-  timeZone: string
-): Date {
-  let guess = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-
-    for (let i = 0; i < 2; i++) {
-      const parts = formatter.formatToParts(guess);
-      let y = year, m = month, d = day, h = hours, min = minutes, s = 0;
-      for (const p of parts) {
-        if (p.type === 'year') y = parseInt(p.value, 10);
-        if (p.type === 'month') m = parseInt(p.value, 10);
-        if (p.type === 'day') d = parseInt(p.value, 10);
-        if (p.type === 'hour') {
-          const val = parseInt(p.value, 10);
-          h = val === 24 ? 0 : val;
-        }
-        if (p.type === 'minute') min = parseInt(p.value, 10);
-        if (p.type === 'second') s = parseInt(p.value, 10);
-      }
-      const tzAsUtc = Date.UTC(y, m - 1, d, h, min, s, 0);
-      const diff = tzAsUtc - guess.getTime();
-      guess = new Date(guess.getTime() - diff);
-    }
-  } catch {
-    return new Date(year, month - 1, day, hours, minutes, 0, 0);
-  }
-  return guess;
-}
 
 export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses }) => {
   // Support and permissions state
@@ -863,56 +816,31 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       for (const { deadline, course } of matchingItems) {
         if (!deadline.date) continue;
 
-        const [year, month, day] = deadline.date.split('-').map((v) => parseInt(v, 10));
-        if (!year || !month || !day) continue;
-
         for (const leadTime of rule.leadTimes) {
           const leadOption = LEAD_TIME_OPTIONS.find((opt) => opt.id === leadTime);
           const daysToSubtract = leadOption ? leadOption.daysBefore : 0;
 
-          // Compute target date after subtracting lead days
-          const baseUtcDate = new Date(Date.UTC(year, month - 1, day - daysToSubtract));
-          const targetYear = baseUtcDate.getUTCFullYear();
-          const targetMonth = baseUtcDate.getUTCMonth() + 1;
-          const targetDay = baseUtcDate.getUTCDate();
-
-          // Compute exact reminder timestamp interpreted in settings.timeZone
-          const reminderTargetDate = getZonedTargetDate(
-            targetYear,
-            targetMonth,
-            targetDay,
-            remHours,
-            remMinutes,
+          // Compute exact reminder timestamp using luxon
+          const instantUtcDt = computeReminderInstant(
+            deadline.date,
+            reminderTimeOfDay,
+            daysToSubtract,
             settings.timeZone
           );
+          const instantMs = instantUtcDt.toMillis();
 
-          if (reminderTargetDate.getTime() <= nowTime) {
+          if (instantMs <= nowTime) {
             continue;
           }
 
-          const reminderIso = reminderTargetDate.toISOString();
+          const reminderIso = instantUtcDt.toISO()!;
           const deduplicationKey = `${deadline.id}-${reminderIso}`;
           if (seenDeduplicationKeys.has(deduplicationKey)) {
             continue;
           }
           seenDeduplicationKeys.add(deduplicationKey);
 
-          let formattedDateTime = '';
-          try {
-            formattedDateTime = new Intl.DateTimeFormat('en-US', {
-              timeZone: settings.timeZone,
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-              timeZoneName: 'short',
-            }).format(reminderTargetDate);
-          } catch {
-            formattedDateTime = reminderTargetDate.toLocaleString();
-          }
+          const formattedDateTime = formatReminderInstantLocal(instantUtcDt, settings.timeZone);
 
           reminders.push({
             id: `${rule.id}-${deadline.id}-${leadTime}`,

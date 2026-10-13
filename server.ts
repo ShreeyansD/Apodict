@@ -7,6 +7,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { registerPhoneRoutes } from './phoneVerification.ts';
 import { registerPushReminderRoutes } from './pushRemindersServer.ts';
+import { computeReminderInstant } from './src/utils/reminderInstant.ts';
 import {
   requireStudentAiAuthAndRateLimit,
   authenticateStudent,
@@ -54,6 +55,28 @@ app.use((req, res, next) => {
 });
 registerPhoneRoutes(app);
 registerPushReminderRoutes(app);
+
+// ---------------------------------------------------------------------------
+// Startup Self-Check: Push Reminder Time Conversion in User Time Zone
+// ---------------------------------------------------------------------------
+function runReminderStartupSelfCheck() {
+  const check1 = computeReminderInstant('2026-10-13', '11:30', 0, 'America/Chicago').toISO();
+  const expected1 = '2026-10-13T16:30:00.000Z';
+  if (check1 !== expected1) {
+    console.error(
+      `[REMINDER STARTUP ERROR] Self-check failed for America/Chicago on 2026-10-13 at 11:30. Expected ${expected1}, got ${check1}`
+    );
+  }
+
+  const check2 = computeReminderInstant('2026-12-15', '11:30', 0, 'America/Chicago').toISO();
+  const expected2 = '2026-12-15T17:30:00.000Z';
+  if (check2 !== expected2) {
+    console.error(
+      `[REMINDER STARTUP ERROR] Self-check failed for America/Chicago on 2026-12-15 at 11:30. Expected ${expected2}, got ${check2}`
+    );
+  }
+}
+runReminderStartupSelfCheck();
 
 // Initialize shared Gemini AI client with telemetry user-agent
 const ai = new GoogleGenAI({

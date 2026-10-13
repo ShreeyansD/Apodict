@@ -3,6 +3,9 @@ import { initializeApp, getApps, getApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { getFirebaseConfig, authenticateStudent } from './aiProtection.ts';
+import { computeReminderInstant, formatReminderInstantLocal } from './src/utils/reminderInstant.ts';
+
+export { computeReminderInstant, formatReminderInstantLocal };
 
 // ---- Lead time to days mapping ----
 const LEAD_TIME_DAYS_MAP: Record<string, number> = {
@@ -62,6 +65,9 @@ export function getAdminServices() {
 /**
  * Calculates exact target timestamp interpreted in user's saved time zone.
  */
+/**
+ * Legacy compatibility wrapper: delegates to Luxon's computeReminderInstant
+ */
 export function getZonedTargetDate(
   year: number,
   month: number,
@@ -70,41 +76,12 @@ export function getZonedTargetDate(
   minutes: number,
   timeZone: string
 ): Date {
-  let guess = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
-  try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timeZone || 'America/New_York',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-
-    for (let i = 0; i < 2; i++) {
-      const parts = formatter.formatToParts(guess);
-      let y = year, m = month, d = day, h = hours, min = minutes, s = 0;
-      for (const p of parts) {
-        if (p.type === 'year') y = parseInt(p.value, 10);
-        if (p.type === 'month') m = parseInt(p.value, 10);
-        if (p.type === 'day') d = parseInt(p.value, 10);
-        if (p.type === 'hour') {
-          const val = parseInt(p.value, 10);
-          h = val === 24 ? 0 : val;
-        }
-        if (p.type === 'minute') min = parseInt(p.value, 10);
-        if (p.type === 'second') s = parseInt(p.value, 10);
-      }
-      const tzAsUtc = Date.UTC(y, m - 1, d, h, min, s, 0);
-      const diff = tzAsUtc - guess.getTime();
-      guess = new Date(guess.getTime() - diff);
-    }
-  } catch {
-    return new Date(year, month - 1, day, hours, minutes, 0, 0);
-  }
-  return guess;
+  return computeReminderInstant(
+    `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+    0,
+    timeZone
+  ).toJSDate();
 }
 
 /**
@@ -326,35 +303,18 @@ async function evaluateUserReminders(
         continue;
       }
 
-      const [year, month, day] = deadline.date.split('-').map((v: string) => parseInt(v, 10));
-      if (!year || !month || !day) continue;
-
       for (const leadTime of rule.leadTimes) {
         const daysToSubtract = LEAD_TIME_DAYS_MAP[leadTime] ?? 0;
-        const baseUtcDate = new Date(Date.UTC(year, month - 1, day - daysToSubtract));
-        const targetYear = baseUtcDate.getUTCFullYear();
-        const targetMonth = baseUtcDate.getUTCMonth() + 1;
-        const targetDay = baseUtcDate.getUTCDate();
-
-        const reminderTargetDate = getZonedTargetDate(
-          targetYear,
-          targetMonth,
-          targetDay,
-          remHours,
-          remMinutes,
+        const instantUtcDt = computeReminderInstant(
+          deadline.date,
+          reminderTimeOfDay,
+          daysToSubtract,
           effectiveZone
         );
 
-        const instantMs = reminderTargetDate.getTime();
-        const reminderInstantUtc = reminderTargetDate.toISOString();
-        let reminderInstantLocal = '';
-        try {
-          reminderInstantLocal = new Intl.DateTimeFormat('en-US', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-            timeZone: effectiveZone,
-          }).format(reminderTargetDate);
-        } catch {}
+        const instantMs = instantUtcDt.toMillis();
+        const reminderInstantUtc = instantUtcDt.toISO()!;
+        const reminderInstantLocal = formatReminderInstantLocal(instantUtcDt, effectiveZone);
 
         const logKey = `${deadline.id}_${leadTime}_${deadline.date}`.replace(/[^a-zA-Z0-9_-]/g, '_');
         let isAlreadySent = false;
@@ -572,28 +532,21 @@ export function registerPushReminderRoutes(app: Express) {
 
       for (const item of matchingItems) {
         if (!item.deadline.date || item.deadline.completed) continue;
-        const [year, month, day] = item.deadline.date.split('-').map(Number);
-        if (!year || !month || !day) continue;
 
         const remTime = rule.customReminderTime || effectiveDefaultTime;
-        const [remH, remM] = remTime.split(':').map(Number);
-
         const leadTimes = Array.isArray(rule.leadTimes) && rule.leadTimes.length > 0
           ? rule.leadTimes
           : ['morning_of'];
 
         for (const lt of leadTimes) {
           const days = LEAD_TIME_DAYS_MAP[lt] ?? 0;
-          const baseUtc = new Date(Date.UTC(year, month - 1, day - days));
-          const reminderTargetDate = getZonedTargetDate(
-            baseUtc.getUTCFullYear(),
-            baseUtc.getUTCMonth() + 1,
-            baseUtc.getUTCDate(),
-            remH,
-            remM,
+          const instantUtcDt = computeReminderInstant(
+            item.deadline.date,
+            remTime,
+            days,
             effectiveZone
           );
-          const instantMs = reminderTargetDate.getTime();
+          const instantMs = instantUtcDt.toMillis();
           if (instantMs > nowMs) {
             upcomingReminders.push({
               deadline: item.deadline,
