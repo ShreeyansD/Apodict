@@ -501,6 +501,7 @@ export default function App() {
                 {activeTab === 'collision' && 'Collision Map'}
                 {activeTab === 'planner' && 'Study Planner'}
                 {activeTab === 'grades' && 'Grade Simulator'}
+                {activeTab === 'examprep' && 'Exam Prep'}
                 {activeTab === 'push' && 'Notifications'}
                 {activeTab === 'calendar' && 'Google Calendar Sync'}
               </h1>
@@ -510,6 +511,7 @@ export default function App() {
               {activeTab === 'collision' && 'Flagging overlapping exams and papers across your course load.'}
               {activeTab === 'planner' && 'Dynamic daily study sprints and spaced repetition milestones.'}
               {activeTab === 'grades' && 'Target GPA calculator and final exam weight simulations.'}
+              {activeTab === 'examprep' && 'Generate high-yield practice questions and structured study guides.'}
               {activeTab === 'push' && 'Get deadline alerts on this phone or computer.'}
               {activeTab === 'calendar' && 'Sync deadlines and study milestones to your Google Calendar.'}
             </p>

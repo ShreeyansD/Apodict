@@ -2052,8 +2052,8 @@ export const ExamPrep: React.FC<ExamPrepProps> = ({
             <FileQuestion className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             <span>Exam Prep</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Turn your lecture notes into high-yield practice questions and structured study guides.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            Convert lecture notes and study materials into interactive flashcards, multiple-choice questions, short-answer prompts, and structured study guides.
           </p>
         </div>
 

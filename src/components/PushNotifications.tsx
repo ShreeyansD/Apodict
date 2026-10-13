@@ -10,7 +10,6 @@ import {
   Smartphone, 
   Globe, 
   Clock, 
-  Send, 
   BellOff, 
   Check, 
   Loader2,
@@ -19,8 +18,6 @@ import {
   Edit3,
   Trash2,
   X,
-  Server,
-  HelpCircle
 } from 'lucide-react';
 import { Course, Deadline, DeadlineType } from '../types/academic';
 import { ReminderLeadTime, NotificationRuleScope } from '../types/notifications';
@@ -79,18 +76,6 @@ function parseUserAgent(ua: string): { browser: string; os: string } {
   return { browser, os };
 }
 
-function formatTimeAgo(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  if (diffMs < 0) return 'just now';
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return 'just now';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} min ago`;
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-}
 
 
 export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses }) => {
@@ -106,29 +91,11 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
   const [isEnabledOnDevice, setIsEnabledOnDevice] = useState<boolean>(false);
   const [isEnabling, setIsEnabling] = useState<boolean>(false);
   const [isDisabling, setIsDisabling] = useState<boolean>(false);
-  const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
-  const [isSendingServerTest, setIsSendingServerTest] = useState<boolean>(false);
-  const [lastServerCheck, setLastServerCheck] = useState<{ time: string; pushesSent?: number; usersChecked?: number } | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Saved devices state
   const [devices, setDevices] = useState<SavedDevice[]>([]);
   const [isRemovingDevice, setIsRemovingDevice] = useState<string | null>(null);
-
-  // Diagnostics check state
-  const [isCheckingWhy, setIsCheckingWhy] = useState<boolean>(false);
-  const [diagnosticsResult, setDiagnosticsResult] = useState<any | null>(null);
-  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
-
-  // Rule test state
-  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
-  const [ruleTestResults, setRuleTestResults] = useState<Record<string, {
-    success: boolean;
-    title?: string;
-    body?: string;
-    tokenCount?: number;
-    message?: string;
-  }>>({});
 
   // Push Settings State (Time Zone & Default Time)
   const [settings, setSettings] = useState<PushSettings>(DEFAULT_PUSH_SETTINGS);
@@ -253,23 +220,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       }
     });
 
-    const fetchServerStatus = async () => {
-      try {
-        const res = await fetch('/api/push/status');
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && data.lastRun) {
-            setLastServerCheck({
-              time: data.lastRun.time,
-              pushesSent: data.lastRun.pushesSent ?? 0,
-              usersChecked: data.lastRun.usersChecked ?? 0,
-            });
-          }
-        }
-      } catch {}
-    };
-
-    fetchServerStatus();
 
     const handleRulesUpdated = async () => {
       try {
@@ -392,92 +342,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
     }
   };
 
-  // Show test notification locally
-  const handleShowTestNotification = async () => {
-    setActionMessage(null);
-    setIsSendingTest(true);
-
-    try {
-      if (!('serviceWorker' in navigator)) {
-        throw new Error('Service Worker not supported.');
-      }
-      const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification('Apodict', {
-        body: 'Notifications are working.',
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        data: { url: '/' },
-      });
-      setActionMessage({
-        type: 'success',
-        text: 'Test notification triggered! Check your notification center or system banner.',
-      });
-    } catch (err: any) {
-      console.error('Error showing test notification:', err);
-      setActionMessage({
-        type: 'error',
-        text: err?.message || 'Could not show test notification. Check if notification permissions are allowed.',
-      });
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
-
-  // Send test notification via server FCM endpoint
-  const handleSendServerTest = async () => {
-    setActionMessage(null);
-    setIsSendingServerTest(true);
-
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('Please sign in to send a test notification from the server.');
-      }
-
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/push/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Server test request failed.');
-      }
-
-      setActionMessage({
-        type: 'success',
-        text: data.message || `Test notification dispatched from server! Reached ${data.successCount ?? 1} device(s).`,
-      });
-
-      // Refresh server check status
-      try {
-        const statusRes = await fetch('/api/push/status');
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          if (statusData.lastRun) {
-            setLastServerCheck({
-              time: statusData.lastRun.time,
-              pushesSent: statusData.lastRun.pushesSent ?? 0,
-              usersChecked: statusData.lastRun.usersChecked ?? 0,
-            });
-          }
-        }
-      } catch {}
-    } catch (err: any) {
-      console.error('Error sending server test push:', err);
-      setActionMessage({
-        type: 'error',
-        text: err?.message || 'Could not send test notification from server.',
-      });
-    } finally {
-      setIsSendingServerTest(false);
-    }
-  };
-
   // Remove a saved device from Firestore
   const handleRemoveSavedDevice = async (device: SavedDevice) => {
     const user = auth.currentUser;
@@ -503,90 +367,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       });
     } finally {
       setIsRemovingDevice(null);
-    }
-  };
-
-  // Check why a reminder hasn't sent (runs dry-run diagnostics on server)
-  const handleCheckWhyNotSent = async () => {
-    setIsCheckingWhy(true);
-    setDiagnosticsError(null);
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('Please sign in to run reminder diagnostics.');
-      }
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/push/check-me', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to evaluate reminders.');
-      }
-      setDiagnosticsResult(data);
-    } catch (err: any) {
-      console.error('Diagnostics error:', err);
-      setDiagnosticsError(err?.message || 'Could not evaluate reminders.');
-    } finally {
-      setIsCheckingWhy(false);
-    }
-  };
-
-  // Send a test reminder for a specific rule
-  const handleTestRule = async (ruleId: string) => {
-    setTestingRuleId(ruleId);
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('Please sign in to test reminder rules.');
-      }
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/push/test-rule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ ruleId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to dispatch test notification for rule.');
-      }
-      if (data.success === false) {
-        setRuleTestResults((prev) => ({
-          ...prev,
-          [ruleId]: {
-            success: false,
-            message: data.message || 'No matching deadlines found for this rule.',
-          },
-        }));
-      } else {
-        setRuleTestResults((prev) => ({
-          ...prev,
-          [ruleId]: {
-            success: true,
-            title: data.title,
-            body: data.body,
-            tokenCount: data.tokenCount,
-          },
-        }));
-      }
-    } catch (err: any) {
-      console.error('Test rule error:', err);
-      setRuleTestResults((prev) => ({
-        ...prev,
-        [ruleId]: {
-          success: false,
-          message: err?.message || 'Failed to dispatch test notification.',
-        },
-      }));
-    } finally {
-      setTestingRuleId(null);
     }
   };
 
@@ -866,9 +646,9 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
     return reminders.slice(0, 15);
   }, [rules, settings, allDeadlinesWithCourse]);
 
-  const step1Done = isEnabledOnDevice;
-  const step2Done = rules.some((r) => r.enabled);
-  const allStepsDone = step1Done && step2Done;
+  const step1Done = Boolean(isEnabledOnDevice);
+  const step2Done = Boolean(rules.length > 0 && rules.some((r) => r.enabled));
+  const isSetupCompleted = step1Done && step2Done;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-16">
@@ -881,10 +661,10 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                Notifications
+                Push Notifications
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Get deadline alerts on this phone or computer.
+                Configure browser and mobile push reminders with custom lead times so you never miss an upcoming exam or project deadline.
               </p>
             </div>
           </div>
@@ -902,13 +682,34 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       </div>
 
       {/* Setup Strip */}
-      {!allStepsDone && (
-        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40 shadow-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Step 1 */}
+      <div className={`p-4 rounded-xl border transition-all shadow-xs ${
+        isSetupCompleted 
+          ? 'border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-950/20' 
+          : 'border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40'
+      }`}>
+        <div className="flex flex-col gap-3">
+          {/* Setup Completed Banner shown when both are done */}
+          {isSetupCompleted && (
+            <div className="flex items-center justify-between pb-2.5 border-b border-emerald-500/20">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 bg-emerald-500 text-white shadow-2xs">
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+                <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                  Setup Completed
+                </span>
+              </div>
+              <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 hidden sm:inline">
+                Deadline alerts are actively monitored
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Step 1: Enable on this device */}
             <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
               step1Done 
-                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
+                ? 'border-emerald-500/20 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200' 
                 : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
             }`}>
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
@@ -921,10 +722,10 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
               <span className="text-xs font-medium">1. Enable on this device</span>
             </div>
 
-            {/* Step 2 */}
+            {/* Step 2: Create a rule */}
             <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
               step2Done 
-                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
+                ? 'border-emerald-500/20 bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200' 
                 : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
             }`}>
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
@@ -936,25 +737,9 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
               </div>
               <span className="text-xs font-medium">2. Create a rule</span>
             </div>
-
-            {/* Step 3 */}
-            <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
-              allStepsDone 
-                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
-                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
-            }`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                allStepsDone 
-                  ? 'bg-emerald-500 text-white' 
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-              }`}>
-                {allStepsDone ? <Check className="w-3 h-3 stroke-[3]" /> : '3'}
-              </div>
-              <span className="text-xs font-medium">3. You're set</span>
-            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* iOS Standalone Warning Notice */}
       {isIosNotStandalone && (
@@ -1031,26 +816,11 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                     </span>
                   )}
                 </div>
-                <div className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center justify-between">
-                    <span>Notification API:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {hasNotificationApi ? 'Available' : 'Unavailable'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Service Worker:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {hasServiceWorkerApi ? 'Active' : 'Unavailable'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Firebase Messaging:</span>
-                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                      {isFirebaseSupported === null ? 'Checking...' : isFirebaseSupported ? 'Supported' : 'Unsupported'}
-                    </span>
-                  </div>
-                </div>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {isFullySupported
+                    ? 'Web push notifications are fully supported on this browser and device.'
+                    : 'Web push notifications are limited or unavailable in this browser environment.'}
+                </p>
               </div>
             </div>
 
@@ -1091,177 +861,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Server Health Status */}
-          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
-            {(() => {
-              const isDelayed = !lastServerCheck?.time || (Date.now() - new Date(lastServerCheck.time).getTime() > 30 * 60 * 1000);
-              return isDelayed ? (
-                <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-2.5 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <div className="font-semibold flex items-center gap-2">
-                      <span>Server Health: Delayed</span>
-                      {lastServerCheck?.time && (
-                        <span className="font-normal text-[11px] opacity-80">
-                          (Last check: {formatTimeAgo(new Date(lastServerCheck.time))})
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90">
-                      Reminder checks may be delayed. Reminders will still send once checks resume.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                    <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                    <span>Last server check: <strong className="text-slate-900 dark:text-white font-medium">{formatTimeAgo(new Date(lastServerCheck.time))}</strong></span>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                    <CheckCircle2 className="w-3 h-3" /> Healthy
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Check Why A Reminder Hasn't Sent Diagnostics */}
-          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <h3 className="text-xs font-semibold text-slate-900 dark:text-white">
-                  Reminder Dispatch Diagnostics
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Troubleshoot why an alert hasn't delivered or preview exact server schedule timings.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCheckWhyNotSent}
-                disabled={isCheckingWhy}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {isCheckingWhy ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <HelpCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                )}
-                <span>Check why a reminder hasn't sent</span>
-              </button>
-            </div>
-
-            {diagnosticsError && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                <span>{diagnosticsError}</span>
-              </div>
-            )}
-
-            {diagnosticsResult && (
-              <div className="p-4 sm:p-5 rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-slate-900/60 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white">
-                      Server Reminder Evaluation Report
-                    </h4>
-                  </div>
-                  <button
-                    onClick={() => setDiagnosticsResult(null)}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                    title="Close diagnostics"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Summary grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Push Tokens</div>
-                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.tokenCount} registered</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Enabled Rules</div>
-                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.enabledRuleCount} active</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Time Zone</div>
-                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate" title={diagnosticsResult.user.timeZoneUsed}>
-                      {diagnosticsResult.user.timeZoneUsed}
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Default Dispatch</div>
-                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.defaultReminderTimeUsed}</div>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span>Server Time (UTC): <strong className="font-mono text-slate-700 dark:text-slate-300">{diagnosticsResult.serverTime}</strong></span>
-                  <span>Evaluation Window: <strong className="text-slate-700 dark:text-slate-300">{diagnosticsResult.windowMinutes} minutes</strong></span>
-                </div>
-
-                {/* Rules & Deadlines list */}
-                <div className="space-y-3 pt-1">
-                  {diagnosticsResult.user.rules.length === 0 ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 italic">No enabled rules found for this user.</p>
-                  ) : (
-                    diagnosticsResult.user.rules.map((r: any) => (
-                      <div key={r.ruleId} className="p-3 rounded-lg border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-semibold text-slate-900 dark:text-white">
-                          <span>Rule: {r.ruleName}</span>
-                          <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                            {r.deadlines.length} deadline check{r.deadlines.length === 1 ? '' : 's'}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {r.deadlines.map((dl: any, idx: number) => {
-                            const isDue = dl.status === 'due now';
-                            const isSent = dl.status === 'already sent';
-                            const isEarly = dl.status.startsWith('too early');
-                            const isLate = dl.status.startsWith('too late');
-
-                            let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
-                            if (isDue) badgeColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
-                            else if (isSent) badgeColor = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20';
-                            else if (isEarly) badgeColor = 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20';
-                            else if (isLate) badgeColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
-
-                            return (
-                              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 p-2 rounded-md bg-slate-50/50 dark:bg-slate-800/30 text-xs">
-                                <div className="min-w-0">
-                                  <span className="font-medium text-slate-800 dark:text-slate-200">
-                                    {dl.deadlineTitle || 'No matching deadlines'}
-                                  </span>
-                                  {dl.courseName && (
-                                    <span className="text-slate-500 dark:text-slate-400 ml-1.5">({dl.courseName})</span>
-                                  )}
-                                  {dl.reminderInstantLocal && (
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                      Reminder time: {dl.reminderInstantLocal} ({dl.leadTime})
-                                    </div>
-                                  )}
-                                </div>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border shrink-0 ${badgeColor}`}>
-                                  {dl.status}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Saved Devices List */}
@@ -1422,75 +1021,21 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full sm:w-auto">
-                  <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      onClick={handleShowTestNotification}
-                      disabled={isSendingTest || isSendingServerTest}
-                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
-                      title="Show a local test notification in this browser"
-                    >
-                      {isSendingTest ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Send className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      )}
-                      <span>Show test notification</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleSendServerTest}
-                      disabled={isSendingServerTest || isSendingTest}
-                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
-                      title="Send a real test push notification from the server"
-                    >
-                      {isSendingServerTest ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Server className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      )}
-                      <span>Send test from server</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDisableNotifications}
-                      disabled={isDisabling}
-                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
-                    >
-                      {isDisabling ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <BellOff className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                      )}
-                      <span>Turn off on this device</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDisableNotifications}
+                    disabled={isDisabling}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isDisabling ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <BellOff className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                    )}
+                    <span>Turn off on this device</span>
+                  </button>
                 </div>
               </div>
-
-              {lastServerCheck && (
-                <div className="flex items-center gap-2 px-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span>
-                    Last server check:{' '}
-                    <span className="font-medium text-slate-700 dark:text-slate-300">
-                      {new Date(lastServerCheck.time).toLocaleString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    {typeof lastServerCheck.pushesSent === 'number' && (
-                      <span className="ml-1 text-slate-500 dark:text-slate-400">
-                        ({lastServerCheck.pushesSent} push{lastServerCheck.pushesSent === 1 ? '' : 'es'} sent)
-                      </span>
-                    )}
-                  </span>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1753,20 +1298,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
 
                       <div className="flex items-center gap-1.5 pt-1">
                         <button
-                          type="button"
-                          onClick={() => handleTestRule(rule.id)}
-                          disabled={testingRuleId === rule.id}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
-                          title="Send a sample reminder now for this rule"
-                        >
-                          {testingRuleId === rule.id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Send className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                          )}
-                          <span>Send test now</span>
-                        </button>
-                        <button
                           onClick={() => handleOpenEditRule(rule)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-150 ease-in-out cursor-pointer"
                           title="Edit rule"
@@ -1785,36 +1316,6 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                       </div>
                     </div>
                   </div>
-
-                  {ruleTestResults[rule.id] && (
-                    <div
-                      className={`mt-3.5 p-3 rounded-lg text-xs border ${
-                        ruleTestResults[rule.id].success
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-900 dark:text-emerald-200'
-                          : 'bg-rose-500/10 border-rose-500/20 text-rose-900 dark:text-rose-200'
-                      }`}
-                    >
-                      {ruleTestResults[rule.id].success ? (
-                        <div className="space-y-1">
-                          <div className="font-semibold flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span>
-                              Test push dispatched to {ruleTestResults[rule.id].tokenCount ?? 1} device{ruleTestResults[rule.id].tokenCount === 1 ? '' : 's'}!
-                            </span>
-                          </div>
-                          <div className="text-[11px] space-y-0.5 pl-5 opacity-90 text-emerald-950 dark:text-emerald-100">
-                            <div><strong className="font-medium">Title:</strong> {ruleTestResults[rule.id].title}</div>
-                            <div><strong className="font-medium">Body:</strong> {ruleTestResults[rule.id].body}</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300">
-                          <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                          <span>{ruleTestResults[rule.id].message}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
