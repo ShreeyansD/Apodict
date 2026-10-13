@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
+  Bell,
   BellRing, 
   CheckCircle2, 
   AlertCircle, 
@@ -18,21 +19,76 @@ import {
   Edit3,
   Trash2,
   X,
-  Server
+  Server,
+  HelpCircle
 } from 'lucide-react';
 import { Course, Deadline, DeadlineType } from '../types/academic';
 import { ReminderLeadTime, NotificationRuleScope } from '../types/notifications';
 import { PushSettings, PushRule, UpcomingPushReminderPreview } from '../types/push';
 import { COMMON_TIMEZONES, LEAD_TIME_OPTIONS, DEADLINE_TYPES } from '../constants/reminders';
-import { getMessagingInstance, getToken, deleteToken, isSupported, auth } from '../services/firebase';
+import { 
+  getMessagingInstance, 
+  getToken, 
+  deleteToken, 
+  isSupported, 
+  auth,
+  db,
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  onAuthStateChanged
+} from '../services/firebase';
 import { dataStore, DEFAULT_PUSH_SETTINGS } from '../services/dataStore';
 
 const PUSH_VAPID_KEY = 'BI3Pp0TuX3nDLT1Uvp3P_VgK8Ev7rXIj6I_3iWKfczc0xzAcOtrQ5JhoPOSdq7KW46_nXwnZrE1c5g-iLljQyHM';
 const LOCAL_STORAGE_TOKEN_KEY = 'apodict_current_push_token';
 
+interface SavedDevice {
+  id: string;
+  token: string;
+  userAgent?: string;
+  createdAt?: string;
+}
+
 interface PushNotificationsProps {
   courses: Course[];
   onOpenAddCourse?: () => void;
+}
+
+function parseUserAgent(ua: string): { browser: string; os: string } {
+  if (!ua) return { browser: 'Unknown Browser', os: 'Unknown OS' };
+  
+  let os = 'Unknown OS';
+  if (/iPhone/i.test(ua)) os = 'iOS (iPhone)';
+  else if (/iPad/i.test(ua)) os = 'iPadOS';
+  else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+
+  let browser = 'Unknown Browser';
+  if (/Edg\//i.test(ua)) browser = 'Microsoft Edge';
+  else if (/Chrome\//i.test(ua) && !/Chromium\//i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/Opera|OPR\//i.test(ua)) browser = 'Opera';
+
+  return { browser, os };
+}
+
+function formatTimeAgo(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return 'just now';
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 }
 
 /**
@@ -101,6 +157,25 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
   const [isSendingServerTest, setIsSendingServerTest] = useState<boolean>(false);
   const [lastServerCheck, setLastServerCheck] = useState<{ time: string; pushesSent?: number; usersChecked?: number } | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Saved devices state
+  const [devices, setDevices] = useState<SavedDevice[]>([]);
+  const [isRemovingDevice, setIsRemovingDevice] = useState<string | null>(null);
+
+  // Diagnostics check state
+  const [isCheckingWhy, setIsCheckingWhy] = useState<boolean>(false);
+  const [diagnosticsResult, setDiagnosticsResult] = useState<any | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+
+  // Rule test state
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
+  const [ruleTestResults, setRuleTestResults] = useState<Record<string, {
+    success: boolean;
+    title?: string;
+    body?: string;
+    tokenCount?: number;
+    message?: string;
+  }>>({});
 
   // Push Settings State (Time Zone & Default Time)
   const [settings, setSettings] = useState<PushSettings>(DEFAULT_PUSH_SETTINGS);
@@ -191,7 +266,39 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       }
     };
 
+    const loadDevices = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        if (isMounted) setDevices([]);
+        return;
+      }
+      try {
+        const snap = await getDocs(collection(db, 'users', user.uid, 'pushTokens'));
+        const list: SavedDevice[] = [];
+        snap.forEach((d) => {
+          const data = d.data();
+          list.push({
+            id: d.id,
+            token: data.token || '',
+            userAgent: data.userAgent || '',
+            createdAt: data.createdAt || '',
+          });
+        });
+        if (isMounted) setDevices(list);
+      } catch (e) {
+        console.error('Failed to load devices:', e);
+      }
+    };
+
     loadData();
+    loadDevices();
+
+    const unsubscribeAuth = onAuthStateChanged(auth, () => {
+      if (isMounted) {
+        loadData();
+        loadDevices();
+      }
+    });
 
     const fetchServerStatus = async () => {
       try {
@@ -223,6 +330,7 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
     window.addEventListener('push-rules-updated', handleRulesUpdated);
     return () => {
       isMounted = false;
+      unsubscribeAuth();
       window.removeEventListener('push-rules-updated', handleRulesUpdated);
     };
   }, []);
@@ -414,6 +522,118 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       });
     } finally {
       setIsSendingServerTest(false);
+    }
+  };
+
+  // Remove a saved device from Firestore
+  const handleRemoveSavedDevice = async (device: SavedDevice) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setIsRemovingDevice(device.id);
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'pushTokens', device.id));
+      setDevices((prev) => prev.filter((d) => d.id !== device.id));
+      if (currentToken && device.token === currentToken) {
+        localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+        setCurrentToken(null);
+        setIsEnabledOnDevice(false);
+      }
+      setActionMessage({
+        type: 'success',
+        text: 'Device registration removed.',
+      });
+    } catch (err: any) {
+      console.error('Failed to remove device:', err);
+      setActionMessage({
+        type: 'error',
+        text: err?.message || 'Failed to remove device.',
+      });
+    } finally {
+      setIsRemovingDevice(null);
+    }
+  };
+
+  // Check why a reminder hasn't sent (runs dry-run diagnostics on server)
+  const handleCheckWhyNotSent = async () => {
+    setIsCheckingWhy(true);
+    setDiagnosticsError(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Please sign in to run reminder diagnostics.');
+      }
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/push/check-me', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to evaluate reminders.');
+      }
+      setDiagnosticsResult(data);
+    } catch (err: any) {
+      console.error('Diagnostics error:', err);
+      setDiagnosticsError(err?.message || 'Could not evaluate reminders.');
+    } finally {
+      setIsCheckingWhy(false);
+    }
+  };
+
+  // Send a test reminder for a specific rule
+  const handleTestRule = async (ruleId: string) => {
+    setTestingRuleId(ruleId);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Please sign in to test reminder rules.');
+      }
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/push/test-rule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ ruleId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to dispatch test notification for rule.');
+      }
+      if (data.success === false) {
+        setRuleTestResults((prev) => ({
+          ...prev,
+          [ruleId]: {
+            success: false,
+            message: data.message || 'No matching deadlines found for this rule.',
+          },
+        }));
+      } else {
+        setRuleTestResults((prev) => ({
+          ...prev,
+          [ruleId]: {
+            success: true,
+            title: data.title,
+            body: data.body,
+            tokenCount: data.tokenCount,
+          },
+        }));
+      }
+    } catch (err: any) {
+      console.error('Test rule error:', err);
+      setRuleTestResults((prev) => ({
+        ...prev,
+        [ruleId]: {
+          success: false,
+          message: err?.message || 'Failed to dispatch test notification.',
+        },
+      }));
+    } finally {
+      setTestingRuleId(null);
     }
   };
 
@@ -718,6 +938,10 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
     return reminders.slice(0, 15);
   }, [rules, settings, allDeadlinesWithCourse]);
 
+  const step1Done = isEnabledOnDevice;
+  const step2Done = rules.some((r) => r.enabled);
+  const allStepsDone = step1Done && step2Done;
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-16">
       {/* Editorial Header */}
@@ -725,14 +949,14 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
         <div>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 flex items-center justify-center text-slate-700 dark:text-slate-300">
-              <BellRing className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-                Push Notifications
+                Notifications
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Configure browser and mobile push alerts for upcoming assignment milestones.
+                Get deadline alerts on this phone or computer.
               </p>
             </div>
           </div>
@@ -744,10 +968,65 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-medium transition-all duration-150 ease-in-out shadow-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Rule</span>
+            <span>Create Rule</span>
           </button>
         </div>
       </div>
+
+      {/* Setup Strip */}
+      {!allStepsDone && (
+        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40 shadow-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Step 1 */}
+            <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
+              step1Done 
+                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
+            }`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                step1Done 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                {step1Done ? <Check className="w-3 h-3 stroke-[3]" /> : '1'}
+              </div>
+              <span className="text-xs font-medium">1. Enable on this device</span>
+            </div>
+
+            {/* Step 2 */}
+            <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
+              step2Done 
+                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
+            }`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                step2Done 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                {step2Done ? <Check className="w-3 h-3 stroke-[3]" /> : '2'}
+              </div>
+              <span className="text-xs font-medium">2. Create a rule</span>
+            </div>
+
+            {/* Step 3 */}
+            <div className={`flex items-center gap-2.5 p-3 rounded-lg border transition-colors ${
+              allStepsDone 
+                ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200' 
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300'
+            }`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                allStepsDone 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                {allStepsDone ? <Check className="w-3 h-3 stroke-[3]" /> : '3'}
+              </div>
+              <span className="text-xs font-medium">3. You're set</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* iOS Standalone Warning Notice */}
       {isIosNotStandalone && (
@@ -884,6 +1163,242 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Server Health Status */}
+          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+            {(() => {
+              const isDelayed = !lastServerCheck?.time || (Date.now() - new Date(lastServerCheck.time).getTime() > 30 * 60 * 1000);
+              return isDelayed ? (
+                <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-2.5 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="font-semibold flex items-center gap-2">
+                      <span>Server Health: Delayed</span>
+                      {lastServerCheck?.time && (
+                        <span className="font-normal text-[11px] opacity-80">
+                          (Last check: {formatTimeAgo(new Date(lastServerCheck.time))})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90">
+                      Reminder checks may be delayed. Reminders will still send once checks resume.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                    <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Last server check: <strong className="text-slate-900 dark:text-white font-medium">{formatTimeAgo(new Date(lastServerCheck.time))}</strong></span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="w-3 h-3" /> Healthy
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Check Why A Reminder Hasn't Sent Diagnostics */}
+          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-white">
+                  Reminder Dispatch Diagnostics
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Troubleshoot why an alert hasn't delivered or preview exact server schedule timings.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCheckWhyNotSent}
+                disabled={isCheckingWhy}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isCheckingWhy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <HelpCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                )}
+                <span>Check why a reminder hasn't sent</span>
+              </button>
+            </div>
+
+            {diagnosticsError && (
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                <span>{diagnosticsError}</span>
+              </div>
+            )}
+
+            {diagnosticsResult && (
+              <div className="p-4 sm:p-5 rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-slate-900/60 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white">
+                      Server Reminder Evaluation Report
+                    </h4>
+                  </div>
+                  <button
+                    onClick={() => setDiagnosticsResult(null)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    title="Close diagnostics"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Summary grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Push Tokens</div>
+                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.tokenCount} registered</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Enabled Rules</div>
+                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.enabledRuleCount} active</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Time Zone</div>
+                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5 truncate" title={diagnosticsResult.user.timeZoneUsed}>
+                      {diagnosticsResult.user.timeZoneUsed}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800/60 bg-white/70 dark:bg-slate-800/40">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Default Dispatch</div>
+                    <div className="font-semibold text-slate-900 dark:text-white mt-0.5">{diagnosticsResult.user.defaultReminderTimeUsed}</div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span>Server Time (UTC): <strong className="font-mono text-slate-700 dark:text-slate-300">{diagnosticsResult.serverTime}</strong></span>
+                  <span>Evaluation Window: <strong className="text-slate-700 dark:text-slate-300">{diagnosticsResult.windowMinutes} minutes</strong></span>
+                </div>
+
+                {/* Rules & Deadlines list */}
+                <div className="space-y-3 pt-1">
+                  {diagnosticsResult.user.rules.length === 0 ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic">No enabled rules found for this user.</p>
+                  ) : (
+                    diagnosticsResult.user.rules.map((r: any) => (
+                      <div key={r.ruleId} className="p-3 rounded-lg border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-900 dark:text-white">
+                          <span>Rule: {r.ruleName}</span>
+                          <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                            {r.deadlines.length} deadline check{r.deadlines.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {r.deadlines.map((dl: any, idx: number) => {
+                            const isDue = dl.status === 'due now';
+                            const isSent = dl.status === 'already sent';
+                            const isEarly = dl.status.startsWith('too early');
+                            const isLate = dl.status.startsWith('too late');
+
+                            let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+                            if (isDue) badgeColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
+                            else if (isSent) badgeColor = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20';
+                            else if (isEarly) badgeColor = 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20';
+                            else if (isLate) badgeColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+
+                            return (
+                              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 p-2 rounded-md bg-slate-50/50 dark:bg-slate-800/30 text-xs">
+                                <div className="min-w-0">
+                                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                                    {dl.deadlineTitle || 'No matching deadlines'}
+                                  </span>
+                                  {dl.courseName && (
+                                    <span className="text-slate-500 dark:text-slate-400 ml-1.5">({dl.courseName})</span>
+                                  )}
+                                  {dl.reminderInstantLocal && (
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                      Reminder time: {dl.reminderInstantLocal} ({dl.leadTime})
+                                    </div>
+                                  )}
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border shrink-0 ${badgeColor}`}>
+                                  {dl.status}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Saved Devices List */}
+          <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Registered Devices ({devices.length})</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Phones and computers configured to receive your deadline notifications.
+                </p>
+              </div>
+            </div>
+
+            {devices.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
+                No devices currently registered. Tap "Enable notifications on this device" below to register this device.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
+                {devices.map((device) => {
+                  const parsed = parseUserAgent(device.userAgent || '');
+                  const isThis = currentToken && device.token === currentToken;
+                  return (
+                    <div key={device.id} className="p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/40 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-slate-900 dark:text-white truncate">
+                              {parsed.browser} on {parsed.os}
+                            </span>
+                            {isThis && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                                This device
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            Added {device.createdAt ? new Date(device.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSavedDevice(device)}
+                        disabled={isRemovingDevice === device.id}
+                        className="px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        {isRemovingDevice === device.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          'Remove'
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1308,7 +1823,21 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                         />
                       </button>
 
-                      <div className="flex items-center gap-1 pt-1">
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleTestRule(rule.id)}
+                          disabled={testingRuleId === rule.id}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-medium transition-all duration-150 ease-in-out shadow-xs cursor-pointer disabled:opacity-50"
+                          title="Send a sample reminder now for this rule"
+                        >
+                          {testingRuleId === rule.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                          )}
+                          <span>Send test now</span>
+                        </button>
                         <button
                           onClick={() => handleOpenEditRule(rule)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-150 ease-in-out cursor-pointer"
@@ -1328,6 +1857,36 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                       </div>
                     </div>
                   </div>
+
+                  {ruleTestResults[rule.id] && (
+                    <div
+                      className={`mt-3.5 p-3 rounded-lg text-xs border ${
+                        ruleTestResults[rule.id].success
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-900 dark:text-emerald-200'
+                          : 'bg-rose-500/10 border-rose-500/20 text-rose-900 dark:text-rose-200'
+                      }`}
+                    >
+                      {ruleTestResults[rule.id].success ? (
+                        <div className="space-y-1">
+                          <div className="font-semibold flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>
+                              Test push dispatched to {ruleTestResults[rule.id].tokenCount ?? 1} device{ruleTestResults[rule.id].tokenCount === 1 ? '' : 's'}!
+                            </span>
+                          </div>
+                          <div className="text-[11px] space-y-0.5 pl-5 opacity-90 text-emerald-950 dark:text-emerald-100">
+                            <div><strong className="font-medium">Title:</strong> {ruleTestResults[rule.id].title}</div>
+                            <div><strong className="font-medium">Body:</strong> {ruleTestResults[rule.id].body}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                          <span>{ruleTestResults[rule.id].message}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

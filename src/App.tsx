@@ -30,7 +30,6 @@ import { SignInScreen } from './components/SignInScreen';
 import { CollisionMap } from './components/CollisionMap';
 import { Planner } from './components/Planner';
 import { Grades } from './components/Grades';
-import { Notifications } from './components/Notifications';
 import { PushNotifications } from './components/PushNotifications';
 import { CalendarSync } from './components/CalendarSync';
 import { ExamPrep } from './components/ExamPrep';
@@ -502,8 +501,7 @@ export default function App() {
                 {activeTab === 'collision' && 'Collision Map'}
                 {activeTab === 'planner' && 'Study Planner'}
                 {activeTab === 'grades' && 'Grade Simulator'}
-                {activeTab === 'notifications' && 'Scheduled Reminders'}
-                {activeTab === 'push' && 'Push Notifications'}
+                {activeTab === 'push' && 'Notifications'}
                 {activeTab === 'calendar' && 'Google Calendar Sync'}
               </h1>
             </div>
@@ -512,8 +510,7 @@ export default function App() {
               {activeTab === 'collision' && 'Flagging overlapping exams and papers across your course load.'}
               {activeTab === 'planner' && 'Dynamic daily study sprints and spaced repetition milestones.'}
               {activeTab === 'grades' && 'Target GPA calculator and final exam weight simulations.'}
-              {activeTab === 'notifications' && 'Automated text alerts and deadline reminder configuration.'}
-              {activeTab === 'push' && 'Configure browser and phone push notifications for study deadlines.'}
+              {activeTab === 'push' && 'Get deadline alerts on this phone or computer.'}
               {activeTab === 'calendar' && 'Sync deadlines and study milestones to your Google Calendar.'}
             </p>
           </div>
@@ -830,12 +827,6 @@ export default function App() {
                 courses={courses}
                 onOpenAddCourse={() => setIsAddModalOpen(true)}
                 onCoursesUpdated={(updated) => setCourses(updated)}
-              />
-            )}
-            {activeTab === 'notifications' && (
-              <Notifications
-                courses={courses}
-                onOpenAddCourse={() => setIsAddModalOpen(true)}
               />
             )}
             {activeTab === 'push' && (

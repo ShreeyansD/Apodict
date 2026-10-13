@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { User } from '../services/firebase';
 
-export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'notifications' | 'calendar' | 'examprep' | 'push';
+export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'calendar' | 'examprep' | 'push';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -96,8 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Sync & Data',
       items: [
         { key: 'calendar', tab: 'calendar', label: 'Calendar', icon: Calendar },
-        { key: 'notifications', tab: 'notifications', label: 'Reminders', icon: Bell },
-        { key: 'push', tab: 'push', label: 'Push Notifications', icon: BellRing },
+        { key: 'push', tab: 'push', label: 'Notifications', icon: Bell },
         { key: 'backup', action: onOpenBackupRestore, label: 'Backup & Restore', icon: HardDrive },
         { key: 'install', action: onOpenInstallGuide, label: 'Install to Home Screen', icon: Smartphone },
       ],
