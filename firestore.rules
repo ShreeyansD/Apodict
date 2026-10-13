@@ -53,6 +53,16 @@ service cloud.firestore {
         allow get, list: if isOwner(userId);
         allow create, update, delete: if isOwner(userId) && isValidId(prepId);
       }
+
+      match /pushTokens/{tokenId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+
+      match /pushPreferences/{prefId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
     }
   }
 }

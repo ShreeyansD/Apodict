@@ -1,4 +1,5 @@
 import React from 'react';
+import Logo from './Logo';
 
 interface TermsProps {
   onBack?: () => void;
@@ -10,14 +11,22 @@ export const TermsAndConditions: React.FC<TermsProps> = ({ onBack }) => {
   return (
     <div className="min-h-screen bg-[#e9f0fa] dark:bg-slate-950 text-[#0f1b33] dark:text-slate-100 antialiased">
       <div className="max-w-3xl mx-auto px-6 py-12">
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-          >
-            &larr; Back to Apodict
-          </button>
-        )}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-200/80 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <Logo size={40} />
+            <span className="text-xl font-bold tracking-tight text-black dark:text-white">
+              Apodict
+            </span>
+          </div>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+            >
+              &larr; Back to App
+            </button>
+          )}
+        </div>
 
         <h1 className="text-3xl font-bold mb-2">Terms &amp; Conditions</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Effective Date: October 9, 2026</p>

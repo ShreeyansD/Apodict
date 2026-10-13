@@ -120,3 +120,33 @@ export {
   writeBatch 
 };
 export type { User };
+
+// Firebase Cloud Messaging (lazily initialized only if supported)
+import { getMessaging, getToken, deleteToken, isSupported, Messaging } from 'firebase/messaging';
+
+let messagingInstance: Messaging | null = null;
+let messagingPromise: Promise<Messaging | null> | null = null;
+
+export async function getMessagingInstance(): Promise<Messaging | null> {
+  if (typeof window === 'undefined') return null;
+  if (messagingInstance) return messagingInstance;
+  if (!messagingPromise) {
+    messagingPromise = (async () => {
+      try {
+        const supported = await isSupported();
+        if (supported) {
+          messagingInstance = getMessaging(app);
+          return messagingInstance;
+        }
+        return null;
+      } catch (err) {
+        console.warn('Firebase Messaging is not supported:', err);
+        return null;
+      }
+    })();
+  }
+  return messagingPromise;
+}
+
+export { getToken, deleteToken, isSupported };
+export type { Messaging };

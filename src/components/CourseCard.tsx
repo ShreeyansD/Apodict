@@ -163,9 +163,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 {course.code}
               </span>
             )}
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {course.term || 'Fall 2026'}
-            </span>
+            {course.term && (
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                {course.term}
+              </span>
+            )}
           </div>
 
           {/* Action Buttons: icon-only buttons with hover tooltips and accessible labels */}

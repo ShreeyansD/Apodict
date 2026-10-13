@@ -61,7 +61,6 @@ Date: 2026-12-08 (8:30 AM - 11:30 AM) | Type: Exam | Weight: 30%`,
     courseCode: 'BIO 81',
     description: 'Life sciences course with lab reports, field survey project, midterms, and weekly quizzes.',
     text: `Biology 81: Ecology and Evolutionary Mechanisms
-Term: Fall 2026
 Instructor: Prof. Tadashi Fukami (fukami@stanford.edu)
 Teaching Assistants: Sarah Chen, David Miller
 
@@ -89,7 +88,6 @@ SCHEDULE OF ASSIGNMENTS & EXAMS
     courseCode: 'PHIL 20',
     description: 'Humanities seminar with essays, discussion leadership, and take-home final paper.',
     text: `PHILOSOPHY 20: Ethics and Contemporary Society
-Fall Semester 2026
 Professor: Dr. Maya Henderson
 Email: mhenderson@university.edu
 

@@ -62,7 +62,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
   const [courseName, setCourseName] = useState(initialData.name || '');
   const [courseCode, setCourseCode] = useState(initialData.code || '');
   const [instructor, setInstructor] = useState(initialData.instructor || '');
-  const [term, setTerm] = useState(initialData.term || 'Fall 2026');
+  const [term, setTerm] = useState(initialData.term || '');
   // '' = None. A missing color (older courses, new syllabus imports) defaults to blue.
   const [selectedColor, setSelectedColor] = useState<string>(initialData.color ?? '#3B82F6');
 
@@ -253,7 +253,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       name: courseName.trim(),
       code: courseCode.trim() || null,
       instructor: instructor.trim() || null,
-      term: term.trim() || 'Fall 2026',
+      term: term.trim() || null,
       color: selectedColor, // '' when None is chosen (stored as an empty string, never undefined)
       rawSyllabus: initialData.rawSyllabus,
       categories: categories.filter((c) => c.name.trim().length > 0),

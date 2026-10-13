@@ -931,9 +931,11 @@ export const Grades: React.FC<GradesProps> = ({
                 >
                   {selectedCourse.code || 'Course'}
                 </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {selectedCourse.term || 'Fall 2026'}
-                </span>
+                {selectedCourse.term && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {selectedCourse.term}
+                  </span>
+                )}
               </div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                 {selectedCourse.name}

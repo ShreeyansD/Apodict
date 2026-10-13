@@ -31,6 +31,7 @@ import { CollisionMap } from './components/CollisionMap';
 import { Planner } from './components/Planner';
 import { Grades } from './components/Grades';
 import { Notifications } from './components/Notifications';
+import { PushNotifications } from './components/PushNotifications';
 import { CalendarSync } from './components/CalendarSync';
 import { ExamPrep } from './components/ExamPrep';
 import { calendarSyncService } from './services/calendarSyncService';
@@ -39,6 +40,7 @@ import { auth, onAuthStateChanged, firebaseSignOut, User } from './services/fire
 // New Policy Component Imports
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsAndConditions } from './components/TermsAndConditions';
+import Logo from './components/Logo';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -276,7 +278,7 @@ export default function App() {
           name: extracted.courseName || 'New Course',
           code: extracted.courseCode || null,
           instructor: extracted.instructor || null,
-          term: extracted.term || 'Fall 2026',
+          term: extracted.term || null,
           rawSyllabus,
           conflicts: extracted.conflicts || [],
           categories: initialCategories,
@@ -293,7 +295,7 @@ export default function App() {
         isOpen: true,
         initialData: {
           name: courseName || 'New Course',
-          term: 'Fall 2026',
+          term: null,
           categories: [
             { id: 'cat-default-1', name: 'Exams', weight: 40 },
             { id: 'cat-default-2', name: 'Homework & Assignments', weight: 30 },
@@ -449,9 +451,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
         <div className="flex flex-col items-center gap-3 animate-in fade-in duration-200">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-600/30">
-            <BookOpen className="w-6 h-6 text-white" />
-          </div>
+          <Logo size={48} />
           <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mt-2" />
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Loading your academic workspace...</p>
         </div>
@@ -503,11 +503,9 @@ export default function App() {
                 {activeTab === 'planner' && 'Study Planner'}
                 {activeTab === 'grades' && 'Grade Simulator'}
                 {activeTab === 'notifications' && 'Scheduled Reminders'}
+                {activeTab === 'push' && 'Push Notifications'}
                 {activeTab === 'calendar' && 'Google Calendar Sync'}
               </h1>
-              <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
-                Fall 2026
-              </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {activeTab === 'courses' && 'Extract syllabus grading policies and manage critical assignment dates.'}
@@ -515,6 +513,7 @@ export default function App() {
               {activeTab === 'planner' && 'Dynamic daily study sprints and spaced repetition milestones.'}
               {activeTab === 'grades' && 'Target GPA calculator and final exam weight simulations.'}
               {activeTab === 'notifications' && 'Automated text alerts and deadline reminder configuration.'}
+              {activeTab === 'push' && 'Configure browser and phone push notifications for study deadlines.'}
               {activeTab === 'calendar' && 'Sync deadlines and study milestones to your Google Calendar.'}
             </p>
           </div>
@@ -839,6 +838,9 @@ export default function App() {
                 onOpenAddCourse={() => setIsAddModalOpen(true)}
               />
             )}
+            {activeTab === 'push' && (
+              <PushNotifications />
+            )}
             {activeTab === 'calendar' && (
               <CalendarSync
                 courses={courses}
@@ -850,7 +852,7 @@ export default function App() {
           {/* Clean, Non-intrusive App Footer */}
           <footer className="mt-12 py-6 border-t border-slate-200/60 dark:border-slate-800/60 text-center text-[11px] text-slate-500 dark:text-slate-400 transition-colors">
             <div className="flex justify-center items-center space-x-4">
-              <span>&copy; {new Date().getFullYear()} Apodict</span>
+              <span>&copy; {new Date().getFullYear()} <span className="font-semibold text-black dark:text-white">Apodict</span></span>
               <span className="text-slate-300 dark:text-slate-750">•</span>
               <button
                 onClick={() => { 

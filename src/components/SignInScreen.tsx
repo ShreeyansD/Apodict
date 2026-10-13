@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Logo from './Logo';
 import {
   BookOpen,
   AlertCircle,
@@ -196,10 +197,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
       <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
+            <Logo size={40} />
+            <span className="text-base font-bold tracking-tight text-black dark:text-white">
               Apodict
             </span>
           </div>
@@ -741,12 +740,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
       <footer className="w-full py-8 border-t border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 text-xs text-slate-500 dark:text-slate-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-indigo-600 flex items-center justify-center font-bold text-white shadow-2xs">
-              <BookOpen className="w-3 h-3 text-white" />
-            </div>
-            <span className="font-semibold text-slate-900 dark:text-white">Apodict</span>
-            <span>&bull;</span>
-            <span>Fall 2026 Term</span>
+            <Logo size={24} />
+            <span className="font-semibold text-black dark:text-white">Apodict</span>
           </div>
 
           <div className="flex items-center gap-6">

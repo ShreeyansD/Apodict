@@ -1,5 +1,6 @@
 import { ThemeToggle } from './ThemeToggle';
 import React, { useState } from 'react';
+import Logo from './Logo';
 import { 
   BookOpen, 
   CalendarDays, 
@@ -10,13 +11,14 @@ import {
   X,
   HardDrive,
   Bell,
+  BellRing,
   Calendar,
   FileQuestion,
   Smartphone
 } from 'lucide-react';
 import { User } from '../services/firebase';
 
-export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'notifications' | 'calendar' | 'examprep';
+export type NavTab = 'courses' | 'collision' | 'planner' | 'grades' | 'notifications' | 'calendar' | 'examprep' | 'push';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -95,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { key: 'calendar', tab: 'calendar', label: 'Calendar', icon: Calendar },
         { key: 'notifications', tab: 'notifications', label: 'Reminders', icon: Bell },
+        { key: 'push', tab: 'push', label: 'Push Notifications', icon: BellRing },
         { key: 'backup', action: onOpenBackupRestore, label: 'Backup & Restore', icon: HardDrive },
         { key: 'install', action: onOpenInstallGuide, label: 'Install to Home Screen', icon: Smartphone },
       ],
@@ -146,16 +149,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Top Bar */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white sticky top-0 z-30">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
-            <BookOpen className="w-4 h-4" />
-          </div>
+          <Logo size={36} />
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
-              <span className="text-indigo-600 dark:text-indigo-400">Apodict</span>
+            <h1 className="text-base font-bold tracking-tight text-black dark:text-white leading-tight">
+              Apodict
             </h1>
-            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium tracking-wider uppercase">
-              Fall 2026 Term
-            </p>
           </div>
         </div>
 
@@ -203,16 +201,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="p-5 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
+            <Logo size={40} />
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-                <span className="text-indigo-600 dark:text-indigo-400 font-semibold">Apodict</span>
+              <h2 className="text-base font-bold text-black dark:text-white tracking-tight flex items-center gap-1.5">
+                Apodict
               </h2>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-indigo-950 text-slate-700 dark:text-indigo-300 border border-slate-200 dark:border-indigo-800/60">
-                Fall 2026 Term
-              </span>
             </div>
             <ThemeToggle className="ml-auto" />
           </div>

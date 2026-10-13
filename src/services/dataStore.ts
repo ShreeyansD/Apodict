@@ -20,6 +20,53 @@ const PLANS_STORAGE_KEY = 'semester_command_center_plans_v1';
 const NOTIFICATION_SETTINGS_STORAGE_KEY = 'semester_command_center_notification_settings_v1';
 const NOTIFICATION_RULES_STORAGE_KEY = 'semester_command_center_notification_rules_v1';
 const EXAM_PREPS_STORAGE_KEY = 'semester_command_center_exam_preps_v1';
+const PUSH_PREFERENCES_STORAGE_KEY = 'apodict_push_preferences_v1';
+
+export interface PushPreferences {
+  oneDayBefore: boolean;
+  threeHoursBefore: boolean;
+  oneHourBefore: boolean;
+  updatedAt?: string;
+}
+
+export const DEFAULT_PUSH_PREFERENCES: PushPreferences = {
+  oneDayBefore: true,
+  threeHoursBefore: true,
+  oneHourBefore: false,
+};
+
+export interface PushTokenRecord {
+  token: string;
+  userAgent: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function readLocalPushPreferencesSafe(): PushPreferences | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(PUSH_PREFERENCES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSavePushPreferencesToLocalStorage(prefs: PushPreferences): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PUSH_PREFERENCES_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {}
+}
+
+function getPushTokenDocId(token: string): string {
+  let hash = 0;
+  for (let i = 0; i < token.length; i++) {
+    hash = ((hash << 5) - hash + token.charCodeAt(i)) | 0;
+  }
+  const cleanSuffix = token.replace(/[^a-zA-Z0-9_-]/g, '').slice(-20);
+  return `push_${Math.abs(hash)}_${cleanSuffix || 'tok'}`;
+}
 
 // Initial sample assignment plan for collegiate demo
 const INITIAL_PLANS: AssignmentPlan[] = [];
@@ -91,7 +138,7 @@ const DEMO_COURSES: Course[] = [
     name: 'CS 106B: Programming Abstractions',
     code: 'CS 106B',
     instructor: 'Dr. Julie Zelenski',
-    term: 'Fall 2026',
+    term: null,
     color: '#3B82F6', // Blue
     targetGrade: 90,
     categories: [
@@ -115,7 +162,7 @@ const DEMO_COURSES: Course[] = [
     name: 'ECON 50: Economic Analysis I',
     code: 'ECON 50',
     instructor: 'Prof. Mark Duggan',
-    term: 'Fall 2026',
+    term: null,
     color: '#10B981', // Emerald
     targetGrade: 85,
     categories: [
@@ -140,7 +187,7 @@ const DEMO_COURSES: Course[] = [
     name: 'PSYC 1: Introduction to Psychology',
     code: 'PSYC 1',
     instructor: 'Dr. James Gross',
-    term: 'Fall 2026',
+    term: null,
     color: '#8B5CF6', // Purple
     targetGrade: 93,
     categories: [
@@ -1375,6 +1422,120 @@ export const dataStore = {
   },
 
   /**
+   * Save push token for the signed-in user
+   */
+  async savePushToken(token: string): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    const docId = getPushTokenDocId(token);
+    const path = `users/${userId}/pushTokens/${docId}`;
+    const docRef = doc(db, 'users', userId, 'pushTokens', docId);
+    const tokenRecord: PushTokenRecord = {
+      token,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await setDoc(docRef, tokenRecord);
+      notifySaveError(null);
+    } catch (err) {
+      console.error('Failed to save push token to Firestore:', err);
+      notifySaveError({
+        message: 'Failed to save push token to cloud database.',
+        retry: async () => {
+          await this.savePushToken(token);
+        },
+      });
+      handleFirestoreError(err, OperationType.WRITE, path);
+    }
+  },
+
+  /**
+   * Remove push token for the signed-in user
+   */
+  async removePushToken(token: string): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    const docId = getPushTokenDocId(token);
+    const path = `users/${userId}/pushTokens/${docId}`;
+    const docRef = doc(db, 'users', userId, 'pushTokens', docId);
+    try {
+      await deleteDoc(docRef);
+      notifySaveError(null);
+    } catch (err) {
+      console.error('Failed to remove push token from Firestore:', err);
+      notifySaveError({
+        message: 'Failed to remove push token from cloud database.',
+        retry: async () => {
+          await this.removePushToken(token);
+        },
+      });
+      handleFirestoreError(err, OperationType.DELETE, path);
+    }
+  },
+
+  /**
+   * Get push notification preferences for the signed-in user
+   */
+  async getPushPreferences(): Promise<PushPreferences> {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      return readLocalPushPreferencesSafe() || { ...DEFAULT_PUSH_PREFERENCES };
+    }
+    const path = `users/${userId}/pushPreferences/preferences`;
+    try {
+      const docRef = doc(db, 'users', userId, 'pushPreferences', 'preferences');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as PushPreferences;
+        safeSavePushPreferencesToLocalStorage(data);
+        notifySaveError(null);
+        return data;
+      }
+      const local = readLocalPushPreferencesSafe();
+      return local || { ...DEFAULT_PUSH_PREFERENCES };
+    } catch (err) {
+      console.warn('Failed to load push preferences from Firestore (falling back to local cache):', err);
+      const local = readLocalPushPreferencesSafe();
+      return local || { ...DEFAULT_PUSH_PREFERENCES };
+    }
+  },
+
+  /**
+   * Save push notification preferences for the signed-in user
+   */
+  async savePushPreferences(prefsUpdate: Partial<PushPreferences>): Promise<PushPreferences> {
+    const current = await this.getPushPreferences();
+    const updated: PushPreferences = {
+      ...current,
+      ...prefsUpdate,
+      updatedAt: new Date().toISOString(),
+    };
+    safeSavePushPreferencesToLocalStorage(updated);
+
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      const path = `users/${userId}/pushPreferences/preferences`;
+      const docRef = doc(db, 'users', userId, 'pushPreferences', 'preferences');
+      try {
+        await setDoc(docRef, updated);
+        notifySaveError(null);
+      } catch (err) {
+        console.error('Failed to save push preferences to Firestore:', err);
+        notifySaveError({
+          message: 'Failed to save push preferences to cloud database.',
+          retry: async () => {
+            await this.savePushPreferences(prefsUpdate);
+          },
+        });
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
+    }
+    return updated;
+  },
+
+  /**
    * Subscribe to Firestore save errors with retry callback
    */
   onSaveError(callback: (err: { message: string; retry: () => Promise<void> } | null) => void) {
@@ -1478,7 +1639,7 @@ export const dataStore = {
         name: courseInput.name.trim(),
         code: courseInput.code?.trim() || null,
         instructor: courseInput.instructor?.trim() || null,
-        term: courseInput.term?.trim() || 'Fall 2026',
+        term: courseInput.term?.trim() || null,
         color: courseInput.color || getRandomColor(),
         rawSyllabus: courseInput.rawSyllabus || undefined,
         order: courses.length,
@@ -2428,6 +2589,21 @@ export const dataStore = {
           await deleteDoc(doc(db, 'users', userId, 'notificationSettings', 'settings'));
         } catch (err) {
           console.error('Failed to delete notification settings from Firestore:', err);
+        }
+
+        // 4b. Delete push tokens & push preferences
+        try {
+          const pushTokensSnap = await getDocs(collection(db, 'users', userId, 'pushTokens'));
+          for (const d of pushTokensSnap.docs) {
+            await deleteDoc(doc(db, 'users', userId, 'pushTokens', d.id));
+          }
+        } catch (err) {
+          console.error('Failed to delete push tokens from Firestore:', err);
+        }
+        try {
+          await deleteDoc(doc(db, 'users', userId, 'pushPreferences', 'preferences'));
+        } catch (err) {
+          console.error('Failed to delete push preferences from Firestore:', err);
         }
 
         // 5. Delete user document if present

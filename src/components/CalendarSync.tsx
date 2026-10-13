@@ -811,7 +811,7 @@ export const CalendarSync: React.FC<CalendarSyncProps> = ({
                             {course.code ? `${course.code}: ` : ''}{course.name}
                           </div>
                           <div className="text-[11px] text-[#526580] dark:text-slate-400">
-                            {datedDeadlines} dated deadline(s) • {course.term || 'Fall 2026'}
+                            {datedDeadlines} dated deadline(s){course.term ? ` • ${course.term}` : ''}
                           </div>
                         </div>
                       </div>
