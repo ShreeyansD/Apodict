@@ -29,255 +29,183 @@ export const TermsAndConditions: React.FC<TermsProps> = ({ onBack }) => {
         </div>
 
         <h1 className="text-3xl font-bold mb-2">Terms &amp; Conditions</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Effective Date: October 9, 2026</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Effective Date: October 13, 2026</p>
 
-        <div className="space-y-10 text-sm sm:text-base leading-relaxed">
-          {/* Part 1: Using Apodict */}
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Part 1: Using Apodict</h2>
+        <div className="space-y-6 text-sm sm:text-base leading-relaxed">
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">1. About the Service</h2>
+            <p>
+              Apodict (&ldquo;the app,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) is an academic planning tool
+              that organizes course information, deadlines, and grades. The app includes:
+            </p>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              <li><strong>Courses:</strong> Syllabus parsing (PDF and text), deadline tracking, and grading breakdowns.</li>
+              <li><strong>Collision Map:</strong> Visualization of overlapping deadlines and heavy-workload weeks.</li>
+              <li><strong>Planner:</strong> Milestone plans for large assignments and papers, with estimated hours.</li>
+              <li><strong>Grades:</strong> Weighted grade tracking and what-if scenarios for target scores.</li>
+              <li><strong>Exam Prep:</strong> AI-generated study guides, practice questions, and flashcards from your notes and PDFs.</li>
+              <li><strong>Voice Advisor:</strong> Spoken briefings and conversational study coaching powered by Google Gemini.</li>
+              <li><strong>Calendar Sync:</strong> Syncing deadlines and milestones to a dedicated Apodict Google Calendar.</li>
+              <li><strong>Notifications:</strong> Optional push notification reminders for the deadlines you choose.</li>
+              <li><strong>Backup &amp; Restore:</strong> Downloading and restoring a JSON archive of your data.</li>
+            </ul>
+            <p className="mt-3">
+              By using Apodict, you agree to these Terms &amp; Conditions and our{' '}
+              <a href="/privacy" className={LINK}>Privacy Policy</a>. If you do not agree, do not use the app.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">1. About the Service</h3>
-              <p>
-                Apodict (&ldquo;the app,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) is an academic workflow
-                platform that organizes course information, deadlines, and grades. Apodict is operated by{' '}
-                <strong>Shreeyans Dodda</strong>, which is our registered brand name. The app provides:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li><strong>Course Center:</strong> Syllabus parsing (PDF and text), deadline tracking, and grading category breakdown.</li>
-                <li><strong>Collision Map:</strong> Identification and visualization of overlapping exams and high-workload crunch weeks.</li>
-                <li><strong>Milestone Planner:</strong> Deconstructing large assignments and papers into milestone roadmaps with estimated hours.</li>
-                <li><strong>Grades Calculator:</strong> Weighted GPA tracking and what-if simulation for target final exam scores.</li>
-                <li><strong>Google Calendar Sync:</strong> Synchronizing course deadlines and milestones to a dedicated Apodict Google Calendar.</li>
-                <li><strong>AI Audio Briefings &amp; Voice Advisor:</strong> Real-time spoken briefings and conversational study coaching powered by Google Gemini.</li>
-                <li><strong>Academic Search Grounding:</strong> Exploration of course-related reference materials and study topics.</li>
-                <li><strong>Backup &amp; Restore:</strong> Local JSON archive download and restoration.</li>
-                <li><strong>Deadline Text Reminders:</strong> Optional automated SMS deadline notifications via Twilio.</li>
-              </ul>
-              <p className="mt-3">
-                By accessing or using Apodict, you agree to be bound by these Terms &amp; Conditions and our{' '}
-                <a href="/privacy" className={LINK}>Privacy Policy</a>. If you do not agree to these terms, do not use the app.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">2. Eligibility and Account Responsibility</h2>
+            <p>
+              You must be at least 13 years old to use Apodict. You sign in with your personal Google account and are responsible for
+              keeping it secure and for everything done under it.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">2. Eligibility and Account Responsibility</h3>
-              <p>
-                You must be at least 13 years old to use Apodict. You authenticate using your personal Google account. You are responsible
-                for maintaining the confidentiality and security of your account, as well as for all actions performed under your account.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">3. Your Content</h2>
+            <p>
+              You own the syllabi, PDFs, notes, assignments, scores, and other content you upload or enter into Apodict. By providing
+              it, you give us a worldwide, non-exclusive, royalty-free license to host, process, and display it only to operate the app
+              and deliver its features to you.
+            </p>
+            <p className="mt-2">
+              You confirm that you have the right to submit what you upload and that doing so does not violate any third party&rsquo;s
+              rights or your school&rsquo;s policies.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">3. Your Content and Syllabus Uploads</h3>
-              <p>
-                You retain complete ownership of all syllabi, PDF files, course notes, assignments, scores, and personal data that you upload
-                or input into Apodict. By providing this content, you grant us a worldwide, non-exclusive, royalty-free license to host,
-                process, analyze, and display your content solely for the purpose of operating the app and delivering its features to you.
-              </p>
-              <p className="mt-2">
-                You represent and warrant that you possess all necessary rights and permissions to submit any materials you upload, and that
-                doing so does not violate the intellectual property rights or policies of any third party or educational institution.
-              </p>
-            </section>
+          <section className="p-5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
+            <h2 className="text-xl font-semibold mb-1.5 text-amber-900 dark:text-amber-200">
+              4. AI-Assisted Features &amp; Academic Disclaimer
+            </h2>
+            <p className="text-amber-950 dark:text-amber-100">
+              Apodict uses artificial intelligence (Google Gemini) for syllabus extraction, milestone planning, workload analysis, grade
+              guidance, Exam Prep, audio briefings, and the Voice Advisor:
+            </p>
+            <ul className="list-disc pl-5 mt-2 space-y-1.5 text-amber-950 dark:text-amber-100">
+              <li>
+                <strong>AI Can Be Wrong:</strong> AI models can misread complex syllabi, invent dates, misinterpret grading scales, or
+                write inaccurate study material or practice answers.
+              </li>
+              <li>
+                <strong>For Planning Only:</strong> Extracted dates, milestones, study suggestions, and grade calculations are estimates
+                for personal planning.
+              </li>
+              <li>
+                <strong>Your Responsibility:</strong> You are responsible for checking all dates, exam details, grading weights, and
+                requirements against your official syllabus, your school&rsquo;s learning management system (such as Canvas or
+                Blackboard), and your instructors.
+              </li>
+              <li>
+                <strong>Not an Official Record:</strong> Apodict is an independent tool and is not affiliated with or endorsed by any
+                university, and it is not an official record of your coursework.
+              </li>
+            </ul>
+          </section>
 
-            <section className="p-5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
-              <h3 className="text-lg font-semibold mb-1.5 text-amber-900 dark:text-amber-200">
-                4. AI-Assisted Features &amp; Academic Disclaimer
-              </h3>
-              <p className="text-amber-950 dark:text-amber-100">
-                Apodict incorporates artificial intelligence (including Google Gemini models) for multimodal syllabus extraction, milestone
-                scheduling, workload collision analysis, grade focus guidance, audio briefings, and the interactive Voice Advisor:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-1.5 text-amber-950 dark:text-amber-100">
-                <li>
-                  <strong>AI Inaccuracies:</strong> Generative AI models can occasionally make errors, misinterpret complex or non-standard
-                  syllabus tables, hallucinate deadline dates, or misread grading scales.
-                </li>
-                <li>
-                  <strong>Informational Purpose Only:</strong> All extracted dates, milestone deadlines, study recommendations, and grade
-                  calculations are estimates provided strictly for informational and personal planning purposes.
-                </li>
-                <li>
-                  <strong>Student Responsibility:</strong> You are solely responsible for cross-checking all dates, exam locations, grading
-                  weights, and assignment requirements against your official course syllabus, university learning management systems
-                  (such as Canvas or Blackboard), and instructions given by your professors.
-                </li>
-                <li>
-                  <strong>Not an Institutional Record:</strong> Apodict is an independent planning tool and is not affiliated with,
-                  endorsed by, or an official record of your university or academic department.
-                </li>
-              </ul>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">5. Google Calendar Sync</h2>
+            <p>
+              When you connect Google Calendar, you allow Apodict to create and manage a separate &ldquo;Apodict&rdquo; calendar and
+              fill it with your deadlines and milestones according to the sync mode you choose.
+            </p>
+            <p className="mt-2">
+              Sync depends on Google&rsquo;s services, your network connection, and your sign-in staying valid. Do not rely on calendar
+              sync alone to keep track of your academic obligations.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">5. Google Calendar Synchronization</h3>
-              <p>
-                When you connect Google Calendar, you authorize Apodict to create, update, and manage a secondary &ldquo;Apodict&rdquo;
-                calendar and to populate it with course deadlines and milestone events based on your chosen sync mode (Replace or Add).
-              </p>
-              <p className="mt-2">
-                Calendar sync depends on third-party Google APIs, your device&rsquo;s network connection, and token validity. You should
-                not rely exclusively on Google Calendar sync as your sole notification mechanism for academic obligations.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">6. Audio Briefings &amp; Voice Advisor</h2>
+            <p>
+              The Voice Advisor needs your permission to use your microphone. You agree not to send unlawful, abusive, harassing, or
+              harmful audio. Coaching is generated by AI in real time and is not licensed academic counseling or tutoring.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">6. Audio Briefings &amp; Live Voice Advisor</h3>
-              <p>
-                Using the Live Voice Advisor requires granting your browser permission to access your microphone. You agree not to transmit
-                any unlawful, abusive, harassing, infringing, or harmful audio during voice coaching sessions. Voice coaching is generated
-                in real time by artificial intelligence and does not constitute licensed academic counseling or tutoring.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">7. Notifications</h2>
+            <p>
+              Push notifications are optional and are off until you turn them on and allow them in your browser or device. You can turn
+              them off at any time on the Notifications page or in your device settings.
+            </p>
+            <ul className="list-disc pl-5 mt-2 space-y-1.5">
+              <li>
+                <strong>Best Effort Only:</strong> Notifications may be late or may not arrive. Delivery depends on your device, browser,
+                operating system, battery and focus settings, network connection, notification permissions, and third-party push
+                services. On iPhone, notifications work only after you add Apodict to your Home Screen.
+              </li>
+              <li>
+                <strong>Based on Your Saved Data:</strong> Reminders follow the deadlines, dates, time zone, and rules saved in your
+                account. If a date was extracted incorrectly or you have not updated it, your reminder will be wrong too.
+              </li>
+              <li>
+                <strong>Do Not Rely on Them Alone:</strong> You remain responsible for tracking your deadlines. Do not depend on
+                notifications as your only way to meet an academic obligation.
+              </li>
+              <li>
+                <strong>Message Content:</strong> A notification shows the assignment name, course name, and due date, which may be
+                visible on your lock screen depending on your device settings.
+              </li>
+            </ul>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">7. Acceptable Use</h3>
-              <p>
-                You agree not to misuse Apodict. Specifically, you agree not to:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li>Attempt to gain unauthorized access to any other user&rsquo;s account, data, or Firestore records.</li>
-                <li>Interfere with, disrupt, or place an unreasonable load on the app&rsquo;s servers, WebSockets, or third-party APIs.</li>
-                <li>Reverse engineer, decompile, or scrape the application or its underlying backend endpoints.</li>
-                <li>Enter mobile phone numbers that you do not personally own or are not authorized to use.</li>
-                <li>Use the app for any illegal or fraudulent purpose.</li>
-              </ul>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">8. Acceptable Use</h2>
+            <p>You agree not to misuse Apodict. In particular, you agree not to:</p>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              <li>Try to access another user&rsquo;s account, data, or records.</li>
+              <li>Interfere with, disrupt, or place an unreasonable load on the app&rsquo;s servers or connected services.</li>
+              <li>Reverse engineer, scrape, or send automated requests to the app or its backend endpoints.</li>
+              <li>Use the app for any illegal or fraudulent purpose.</li>
+            </ul>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">8. Backups, Modifications, and Account Termination</h3>
-              <p>
-                We provide a Backup &amp; Restore utility enabling you to download a JSON archive of your academic records. We recommend
-                downloading regular backups of your course data.
-              </p>
-              <p className="mt-2">
-                We reserve the right to modify, suspend, or discontinue any feature of the service at any time without notice. You may
-                discontinue using the service and permanently delete your account and associated records at any time using the
-                &ldquo;Delete my account&rdquo; feature in your account menu.
-              </p>
-            </section>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">9. Backups, Changes, and Account Deletion</h2>
+            <p>
+              Backup &amp; Restore lets you download a JSON archive of your academic records, and we recommend doing so regularly.
+            </p>
+            <p className="mt-2">
+              We may change, suspend, or discontinue any feature at any time without notice. You can stop using the service and
+              permanently delete your account and its data at any time with &ldquo;Delete my account&rdquo; in the account menu.
+            </p>
+          </section>
 
-            <section className="p-5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <h3 className="text-lg font-semibold mb-1.5">9. Disclaimers and Limitations of Liability</h3>
-              <p className="uppercase text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                Please read this section carefully
-              </p>
-              <p>
-                Apodict IS PROVIDED ON AN &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; BASIS WITHOUT WARRANTIES OF ANY KIND,
-                WHETHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-                PARTICULAR PURPOSE, ACCURACY, AND NON-INFRINGEMENT.
-              </p>
-              <p className="mt-3">
-                TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE DEVELOPER OR APODICT BE LIABLE FOR ANY
-                INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, MISSED DEADLINES,
-                ACADEMIC PENALTIES, GRADE REDUCTIONS, FAILED EXAMS, LOSS OF SCHOLARSHIPS, OR OTHER LOSSES RESULTING FROM YOUR USE OF
-                OR INABILITY TO USE THE SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-              </p>
-            </section>
+          <section className="p-5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-semibold mb-1.5">10. Disclaimers and Limitation of Liability</h2>
+            <p className="uppercase text-xs font-bold tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+              Please read this section carefully
+            </p>
+            <p>
+              APODICT IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+              IMPLIED, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, AND
+              NON-INFRINGEMENT.
+            </p>
+            <p className="mt-3">
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE DEVELOPER AND APODICT ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+              CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, MISSED, LATE, OR UNDELIVERED NOTIFICATIONS, MISSED
+              DEADLINES, ACADEMIC PENALTIES, GRADE REDUCTIONS, FAILED EXAMS, LOSS OF SCHOLARSHIPS, OR OTHER LOSSES RESULTING FROM YOUR
+              USE OF OR INABILITY TO USE THE SERVICE, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+            </p>
+          </section>
 
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">10. Changes to These Terms</h3>
-              <p>
-                We may revise these Terms &amp; Conditions from time to time. When changes occur, the &ldquo;Effective Date&rdquo; at the
-                top of this page will be updated. Continued use of Apodict following the posting of changes constitutes your binding
-                acceptance of the revised terms.
-              </p>
-            </section>
-          </div>
+          <section>
+            <h2 className="text-xl font-semibold mb-1.5">11. Changes to These Terms</h2>
+            <p>
+              We may update these terms from time to time. When we do, we will update the &ldquo;Effective Date&rdquo; at the top of
+              this page. Continuing to use Apodict after changes are posted means you accept the revised terms.
+            </p>
+          </section>
 
-          {/* Part 2: SMS Terms */}
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Part 2: SMS Terms (Text Message Reminder Program)</h2>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">1. Program Description</h3>
-              <p>
-                Apodict offers an optional text message reminder service that delivers automated SMS notifications to your mobile phone
-                concerning upcoming course assignments, quizzes, papers, and exam deadlines that you configure in the Reminders tab.
-                Text messages are sent by <strong>Shreeyans Dodda</strong> (our registered brand name) on behalf of Apodict.
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">2. Opt-In &amp; Joining</h3>
-              <p>
-                Participation in text message reminders is completely voluntary and is not required to use the rest of Apodict. To enroll,
-                you must sign in, navigate to <strong>Reminders</strong>, enter your mobile number, actively check the consent checkbox
-                (which is never pre-checked), and click <strong>&ldquo;Yes, sign me up!&rdquo;</strong> You must then enter the 6-digit
-                verification PIN texted to your phone to confirm ownership.
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">3. Types of Messages</h3>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>One-time numeric verification codes sent when you verify or change your mobile number.</li>
-                <li>Automated reminders for the academic deadlines and advance lead times you selected.</li>
-                <li>System responses to HELP and STOP inquiries.</li>
-              </ul>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">4. Message Frequency</h3>
-              <p>
-                Message frequency varies depending on the number of enrolled courses, your reminder rules, and your schedule of upcoming
-                deadlines, up to a maximum of 10 messages per day.
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">5. Rates and Charges</h3>
-              <p className="font-semibold text-indigo-700 dark:text-indigo-300">
-                Message and data rates may apply for any messages sent to you or received from you under your wireless service plan.
-              </p>
-            </section>
-
-            <section className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <h3 className="text-lg font-semibold mb-1.5">6. Support and Help</h3>
-              <p>
-                Reply <strong>&ldquo;HELP&rdquo;</strong> to any text message for assistance, or contact customer support directly at{' '}
-                <a href="mailto:shreeyans21@gmail.com" className={LINK}>shreeyans21@gmail.com</a>.
-              </p>
-            </section>
-
-            <section className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900">
-              <h3 className="text-lg font-semibold mb-1.5 text-amber-900 dark:text-amber-200">7. Opting Out (STOP)</h3>
-              <p className="text-amber-950 dark:text-amber-100">
-                You can cancel SMS notifications at any time by replying <strong>&ldquo;STOP&rdquo;</strong> to any text message, or by
-                clicking unsubscribe in the Reminders tab. We will send a single text confirming your cancellation, and no further
-                messages will be sent unless you re-enroll. To resume, reply <strong>&ldquo;START&rdquo;</strong> or re-enroll in
-                Reminders.
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">8. Wireless Carriers</h3>
-              <p>
-                Wireless carriers (including T-Mobile, AT&amp;T, Verizon, and others) are not liable for delayed or undelivered messages.
-                Message delivery is subject to the effective transmission of your wireless service provider.
-              </p>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold mb-1.5">9. Privacy</h3>
-              <p>
-                We do not sell or share your SMS opt-in data or personal information with third parties for marketing purposes. Your
-                mobile phone number and opt-in consent records are never shared with third parties or affiliates for marketing or
-                promotional purposes. For complete details on our data protection practices, please consult our{' '}
-                <a href="/privacy" className={LINK}>Privacy Policy</a>.
-              </p>
-            </section>
-          </div>
-
-          {/* Contact Section */}
           <section>
             <h2 className="text-xl font-semibold mb-2">Contact Us</h2>
-            <p>If you have any questions or concerns regarding these Terms &amp; Conditions, please contact:</p>
+            <p>If you have questions about these Terms &amp; Conditions, contact:</p>
             <div className="mt-3 text-sm bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-              <p><strong>Registered Brand Name:</strong> Shreeyans Dodda</p>
-              <p><strong>Developer:</strong> Shreeyans Dodda</p>
               <p><strong>Application:</strong> Apodict</p>
+              <p><strong>Developer:</strong> Shreeyans Dodda</p>
               <p>
                 <strong>Email:</strong>{' '}
                 <a href="mailto:shreeyans21@gmail.com" className={LINK}>shreeyans21@gmail.com</a>
