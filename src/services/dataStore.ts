@@ -1,5 +1,6 @@
 import { Course, GradedCategory, Deadline, DeadlineType, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
 import { NotificationSettings, NotificationRule, NotificationRuleScope, ReminderLeadTime } from '../types/notifications';
+import { PushSettings, PushRule } from '../types/push';
 import { calendarSyncService, registerDataStoreHooks } from './calendarSyncService';
 import { 
   auth, 
@@ -7,7 +8,7 @@ import {
   collection, 
   doc, 
   getDocs, 
-  getDoc,
+  getDoc, 
   setDoc, 
   deleteDoc, 
   writeBatch, 
@@ -21,6 +22,19 @@ const NOTIFICATION_SETTINGS_STORAGE_KEY = 'semester_command_center_notification_
 const NOTIFICATION_RULES_STORAGE_KEY = 'semester_command_center_notification_rules_v1';
 const EXAM_PREPS_STORAGE_KEY = 'semester_command_center_exam_preps_v1';
 const PUSH_PREFERENCES_STORAGE_KEY = 'apodict_push_preferences_v1';
+const PUSH_SETTINGS_STORAGE_KEY = 'apodict_push_settings_v1';
+const PUSH_RULES_STORAGE_KEY = 'apodict_push_rules_v1';
+
+export const DEFAULT_PUSH_SETTINGS: PushSettings = {
+  timeZone: typeof Intl !== 'undefined' ? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York') : 'America/New_York',
+  defaultReminderTime: '09:00',
+  updatedAt: new Date().toISOString(),
+};
+
+let inMemoryPushSettings: PushSettings | null = null;
+let hasLoadedPushSettingsForUserId: string | null = null;
+let inMemoryPushRules: PushRule[] = [];
+let hasLoadedPushRulesForUserId: string | null = null;
 
 export interface PushPreferences {
   oneDayBefore: boolean;
@@ -56,6 +70,40 @@ function safeSavePushPreferencesToLocalStorage(prefs: PushPreferences): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(PUSH_PREFERENCES_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {}
+}
+
+function readLocalPushSettingsSafe(): PushSettings | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(PUSH_SETTINGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSavePushSettingsToLocalStorage(settings: PushSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PUSH_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {}
+}
+
+function readLocalPushRulesSafe(): PushRule[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PUSH_RULES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeSavePushRulesToLocalStorage(rules: PushRule[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PUSH_RULES_STORAGE_KEY, JSON.stringify(rules));
   } catch {}
 }
 
@@ -935,6 +983,148 @@ async function loadNotificationRulesForUser(userId: string): Promise<Notificatio
   }
 }
 
+async function persistPushSettingsToFirestore(settings: PushSettings): Promise<void> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return;
+
+  const path = `users/${userId}/pushSettings/settings`;
+  const docRef = doc(db, 'users', userId, 'pushSettings', 'settings');
+  const cleanDoc = JSON.parse(JSON.stringify(settings));
+
+  try {
+    await setDoc(docRef, cleanDoc);
+    notifySaveError(null);
+  } catch (err) {
+    console.error('Failed to save push settings to Firestore:', err);
+    notifySaveError({
+      message: 'Failed to save push settings to cloud database.',
+      retry: async () => {
+        await persistPushSettingsToFirestore(settings);
+      },
+    });
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+async function loadPushSettingsForUser(userId: string): Promise<PushSettings> {
+  const path = `users/${userId}/pushSettings/settings`;
+  try {
+    const docRef = doc(db, 'users', userId, 'pushSettings', 'settings');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      inMemoryPushSettings = snap.data() as PushSettings;
+    } else {
+      const local = readLocalPushSettingsSafe();
+      inMemoryPushSettings = local || { ...DEFAULT_PUSH_SETTINGS };
+    }
+    if (inMemoryPushSettings) {
+      safeSavePushSettingsToLocalStorage(inMemoryPushSettings);
+    }
+    hasLoadedPushSettingsForUserId = userId;
+    notifySaveError(null);
+    return inMemoryPushSettings;
+  } catch (err) {
+    console.warn('Failed to load push settings from Firestore (falling back to local cache):', err);
+    const local = readLocalPushSettingsSafe();
+    if (local) {
+      inMemoryPushSettings = local;
+      hasLoadedPushSettingsForUserId = userId;
+      return inMemoryPushSettings;
+    }
+    inMemoryPushSettings = inMemoryPushSettings || { ...DEFAULT_PUSH_SETTINGS };
+    hasLoadedPushSettingsForUserId = userId;
+    return inMemoryPushSettings;
+  }
+}
+
+async function persistPushRuleToFirestore(rule: PushRule): Promise<void> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return;
+
+  const path = `users/${userId}/pushRules/${rule.id}`;
+  const docRef = doc(db, 'users', userId, 'pushRules', rule.id);
+  const cleanDoc = JSON.parse(JSON.stringify(rule));
+
+  try {
+    await setDoc(docRef, cleanDoc);
+    notifySaveError(null);
+  } catch (err) {
+    console.error('Failed to save push rule to Firestore:', err);
+    notifySaveError({
+      message: `Failed to save push rule "${rule.name}" to cloud database.`,
+      retry: async () => {
+        await persistPushRuleToFirestore(rule);
+      },
+    });
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+async function deletePushRuleFromFirestore(ruleId: string): Promise<void> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return;
+
+  const path = `users/${userId}/pushRules/${ruleId}`;
+  const docRef = doc(db, 'users', userId, 'pushRules', ruleId);
+
+  try {
+    await deleteDoc(docRef);
+    notifySaveError(null);
+  } catch (err) {
+    console.error('Failed to delete push rule from Firestore:', err);
+    notifySaveError({
+      message: 'Failed to delete push rule from cloud database.',
+      retry: async () => {
+        await deletePushRuleFromFirestore(ruleId);
+      },
+    });
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+}
+
+async function loadPushRulesForUser(userId: string): Promise<PushRule[]> {
+  const path = `users/${userId}/pushRules`;
+  try {
+    const colRef = collection(db, 'users', userId, 'pushRules');
+    const snapshot = await getDocs(colRef);
+    const loaded: PushRule[] = [];
+    snapshot.forEach((d) => {
+      loaded.push(d.data() as PushRule);
+    });
+
+    loaded.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (loaded.length === 0) {
+      const local = readLocalPushRulesSafe();
+      if (local.length > 0) {
+        inMemoryPushRules = local;
+        hasLoadedPushRulesForUserId = userId;
+        notifySaveError(null);
+        return inMemoryPushRules;
+      }
+    }
+
+    inMemoryPushRules = loaded;
+    if (loaded.length > 0) {
+      safeSavePushRulesToLocalStorage(loaded);
+    }
+    hasLoadedPushRulesForUserId = userId;
+    notifySaveError(null);
+    return inMemoryPushRules;
+  } catch (err) {
+    console.warn('Failed to load push rules from Firestore (falling back to local cache):', err);
+    const local = readLocalPushRulesSafe();
+    if (local && local.length > 0) {
+      inMemoryPushRules = local;
+      hasLoadedPushRulesForUserId = userId;
+      return inMemoryPushRules;
+    }
+    inMemoryPushRules = inMemoryPushRules || [];
+    hasLoadedPushRulesForUserId = userId;
+    return inMemoryPushRules;
+  }
+}
+
 let saveErrorCallback: ((err: { message: string; retry: () => Promise<void> } | null) => void) | null = null;
 
 export function onSaveError(callback: (err: { message: string; retry: () => Promise<void> } | null) => void) {
@@ -1419,6 +1609,145 @@ export const dataStore = {
     hasLoadedNotificationSettingsForUserId = null;
     inMemoryNotificationRules = [];
     hasLoadedNotificationRulesForUserId = null;
+    inMemoryPushSettings = null;
+    hasLoadedPushSettingsForUserId = null;
+    inMemoryPushRules = [];
+    hasLoadedPushRulesForUserId = null;
+  },
+
+  /**
+   * Load push settings for signed in user
+   */
+  async loadPushSettingsForUser(userId: string): Promise<PushSettings> {
+    return await loadPushSettingsForUser(userId);
+  },
+
+  /**
+   * Get push settings
+   */
+  async getPushSettings(): Promise<PushSettings> {
+    const currentUid = auth.currentUser?.uid;
+    if (currentUid && hasLoadedPushSettingsForUserId !== currentUid) {
+      return await loadPushSettingsForUser(currentUid);
+    }
+    return inMemoryPushSettings || { ...DEFAULT_PUSH_SETTINGS };
+  },
+
+  /**
+   * Save push settings
+   */
+  async savePushSettings(settingsUpdate: Partial<PushSettings>): Promise<PushSettings> {
+    const current = await this.getPushSettings();
+    const updated: PushSettings = {
+      ...current,
+      ...settingsUpdate,
+      updatedAt: new Date().toISOString(),
+    };
+    inMemoryPushSettings = updated;
+    safeSavePushSettingsToLocalStorage(updated);
+    await persistPushSettingsToFirestore(updated);
+    return updated;
+  },
+
+  /**
+   * Load push reminder rules for signed in user
+   */
+  async loadPushRulesForUser(userId: string): Promise<PushRule[]> {
+    return await loadPushRulesForUser(userId);
+  },
+
+  /**
+   * Get push reminder rules
+   */
+  async getPushRules(): Promise<PushRule[]> {
+    const currentUid = auth.currentUser?.uid;
+    if (currentUid && hasLoadedPushRulesForUserId !== currentUid) {
+      return await loadPushRulesForUser(currentUid);
+    }
+    return inMemoryPushRules;
+  },
+
+  /**
+   * Save (create or update) a push reminder rule
+   */
+  async savePushRule(
+    ruleInput: Partial<PushRule> & {
+      name: string;
+      scope: NotificationRuleScope;
+      leadTimes: ReminderLeadTime[];
+    }
+  ): Promise<PushRule> {
+    const rules = [...inMemoryPushRules];
+    const now = new Date().toISOString();
+
+    const ruleId = ruleInput.id || `push-rule-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const existingIndex = rules.findIndex((r) => r.id === ruleId);
+
+    const ruleToSave: PushRule = {
+      id: ruleId,
+      name: ruleInput.name.trim(),
+      enabled: ruleInput.enabled ?? true,
+      scope: ruleInput.scope,
+      leadTimes: ruleInput.leadTimes,
+      customReminderTime: ruleInput.customReminderTime || null,
+      createdAt: ruleInput.createdAt || now,
+      updatedAt: now,
+    };
+
+    if (existingIndex !== -1) {
+      rules[existingIndex] = ruleToSave;
+    } else {
+      rules.unshift(ruleToSave);
+    }
+
+    inMemoryPushRules = rules;
+    safeSavePushRulesToLocalStorage(rules);
+    await persistPushRuleToFirestore(ruleToSave);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('push-rules-updated'));
+    }
+
+    return ruleToSave;
+  },
+
+  /**
+   * Delete a push reminder rule
+   */
+  async deletePushRule(ruleId: string): Promise<boolean> {
+    const rules = inMemoryPushRules;
+    const filtered = rules.filter((r) => r.id !== ruleId);
+    if (filtered.length !== rules.length) {
+      inMemoryPushRules = filtered;
+      safeSavePushRulesToLocalStorage(filtered);
+      await deletePushRuleFromFirestore(ruleId);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('push-rules-updated'));
+      }
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Toggle a push reminder rule enabled state
+   */
+  async togglePushRuleEnabled(ruleId: string, enabled: boolean): Promise<PushRule | null> {
+    const rules = [...inMemoryPushRules];
+    const index = rules.findIndex((r) => r.id === ruleId);
+    if (index === -1) return null;
+
+    const rule = { ...rules[index], enabled, updatedAt: new Date().toISOString() };
+    rules[index] = rule;
+    inMemoryPushRules = rules;
+    safeSavePushRulesToLocalStorage(rules);
+    await persistPushRuleToFirestore(rule);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('push-rules-updated'));
+    }
+
+    return rule;
   },
 
   /**
@@ -2604,6 +2933,19 @@ export const dataStore = {
           await deleteDoc(doc(db, 'users', userId, 'pushPreferences', 'preferences'));
         } catch (err) {
           console.error('Failed to delete push preferences from Firestore:', err);
+        }
+        try {
+          const pushRulesSnap = await getDocs(collection(db, 'users', userId, 'pushRules'));
+          for (const d of pushRulesSnap.docs) {
+            await deleteDoc(doc(db, 'users', userId, 'pushRules', d.id));
+          }
+        } catch (err) {
+          console.error('Failed to delete push rules from Firestore:', err);
+        }
+        try {
+          await deleteDoc(doc(db, 'users', userId, 'pushSettings', 'settings'));
+        } catch (err) {
+          console.error('Failed to delete push settings from Firestore:', err);
         }
 
         // 5. Delete user document if present

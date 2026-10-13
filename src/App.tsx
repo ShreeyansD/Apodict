@@ -839,7 +839,10 @@ export default function App() {
               />
             )}
             {activeTab === 'push' && (
-              <PushNotifications />
+              <PushNotifications
+                courses={courses}
+                onOpenAddCourse={() => setIsAddModalOpen(true)}
+              />
             )}
             {activeTab === 'calendar' && (
               <CalendarSync

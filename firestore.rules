@@ -63,6 +63,20 @@ service cloud.firestore {
         allow get, list: if isOwner(userId);
         allow create, update, delete: if isOwner(userId);
       }
+
+      match /pushSettings/{settingId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+
+      match /pushRules/{ruleId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+    }
+
+    match /system/{docId} {
+      allow read: if isSignedIn();
     }
   }
 }

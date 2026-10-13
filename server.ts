@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { registerPhoneRoutes } from './phoneVerification.ts';
+import { registerPushReminderRoutes } from './pushRemindersServer.ts';
 import {
   requireStudentAiAuthAndRateLimit,
   authenticateStudent,
@@ -52,6 +53,7 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
 });
 registerPhoneRoutes(app);
+registerPushReminderRoutes(app);
 
 // Initialize shared Gemini AI client with telemetry user-agent
 const ai = new GoogleGenAI({
