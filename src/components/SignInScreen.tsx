@@ -12,21 +12,15 @@ import {
   Layers,
   Calculator,
   ShieldCheck,
-  Database,
   ArrowRight,
   Lock,
   Flame,
   FileText,
   CalendarRange,
-  Clock,
   Milestone,
-  Target,
   BarChart3,
-  TrendingUp,
-  CalendarCheck,
   ArrowLeftRight,
-  FileJson,
-  FolderSync,
+  Sparkles,
 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { auth, googleAuthProvider, signInWithPopup, User } from '../services/firebase';
@@ -283,6 +277,9 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
 
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
             <ScrollReveal delay={50} yOffset={0}>
+              <span className="block text-xs uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 sm:mb-4">
+                Syllabus planner for college students
+              </span>
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.12]">
                 A planner that turns your syllabi into{' '}
                 <span className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 dark:from-indigo-400 dark:via-indigo-300 dark:to-sky-400 bg-clip-text text-transparent [filter:drop-shadow(0_0_6px_rgba(99,102,241,0.06))] dark:[filter:drop-shadow(0_0_8px_rgba(129,140,248,0.10))]">
@@ -410,7 +407,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                 Everything you need to navigate college courses
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Purpose-built tools designed to eliminate surprises and reduce academic stress.
+                Syllabus parsing, deadline tracking, a grade calculator, exam prep, and reminders, built to eliminate surprises and reduce academic stress.
               </p>
             </ScrollReveal>
 
@@ -439,24 +436,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                       AI syllabus extraction pulls out every deadline, grading category, professor contact, and policy without manual typing.
                     </p>
                   </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                        Syllabus PDF / Text
-                      </span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Parsed
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">Course weights &amp; contacts</span>
-                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-semibold shrink-0 ml-2">100% verified</span>
-                    </div>
-                  </div>
                 </div>
               </ScrollReveal>
 
@@ -483,24 +462,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                       Pinpoints high-stakes weeks where multiple exams, papers, or projects overlap so you never get blindsided by a crunch week.
                     </p>
-                  </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        Week 8 Midterm Crunch
-                      </span>
-                      <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                        <Flame className="w-3 h-3" />
-                        3 Overlaps
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">CS 201 · ECON 102 · STAT 301</span>
-                      <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold shrink-0 ml-2">High Load</span>
-                    </div>
                   </div>
                 </div>
               </ScrollReveal>
@@ -529,24 +490,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                       Breaks large, overwhelming assignments into realistic step-by-step milestones with estimated study hours and target dates.
                     </p>
                   </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <Milestone className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                        Term Paper Roadmap
-                      </span>
-                      <span className="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
-                        <Target className="w-3 h-3" />
-                        4 Sprints
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">Outline &rarr; Draft &rarr; Review</span>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold shrink-0 ml-2">Paced</span>
-                    </div>
-                  </div>
                 </div>
               </ScrollReveal>
 
@@ -573,24 +516,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                       Track earned scores across weighted categories and simulate what-if scenarios to know exactly what you need on upcoming finals.
                     </p>
-                  </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <BarChart3 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        Target GPA Simulator
-                      </span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        93.4% Current
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">Final exam target score:</span>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold shrink-0 ml-2">84.5% for A</span>
-                    </div>
                   </div>
                 </div>
               </ScrollReveal>
@@ -619,68 +544,32 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                       Sync all dated course deadlines directly into Google Calendar with flexible replacement, add modes, and clean duplicate protection.
                     </p>
                   </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <CalendarCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                        Google Calendar Sync
-                      </span>
-                      <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
-                        <ArrowLeftRight className="w-3 h-3" />
-                        Dedicated
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">&ldquo;Apodict&rdquo; calendar created</span>
-                      <span className="font-mono text-sky-600 dark:text-sky-400 font-semibold shrink-0 ml-2">Live sync</span>
-                    </div>
-                  </div>
                 </div>
               </ScrollReveal>
 
-              {/* Feature 6: Backup & Restore */}
+              {/* Feature 6: And more */}
               <ScrollReveal delay={120} yOffset={0} className="h-full">
                 <div className="group relative overflow-hidden p-6 rounded-2xl bg-white dark:bg-slate-900/80 backdrop-blur-xs border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-400 dark:hover:border-slate-600 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col justify-between">
                   {/* Subtle Ghost Watermark Illustration */}
-                  <Database className="w-28 h-28 absolute -bottom-3 -right-3 text-slate-600/5 dark:text-slate-400/5 pointer-events-none group-hover:scale-105 transition-transform duration-300" aria-hidden="true" />
+                  <Sparkles className="w-28 h-28 absolute -bottom-3 -right-3 text-slate-600/5 dark:text-slate-400/5 pointer-events-none group-hover:scale-105 transition-transform duration-300" aria-hidden="true" />
 
                   <div className="space-y-3 relative z-10">
                     <div className="flex items-center justify-between">
                       <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs">
-                        <Database className="w-5 h-5" />
+                        <Sparkles className="w-5 h-5" />
                       </div>
                       <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                        <FileJson className="w-3.5 h-3.5" />
-                        <span>JSON Portability</span>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>More Tools</span>
                       </span>
                     </div>
 
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Backup &amp; Restore
+                      And more
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Download a full JSON archive of your courses, categories, grades, and milestone roadmaps anytime, or restore your backup in seconds.
+                      Exam Prep with study guides, practice questions, and flashcards. A Voice Advisor for spoken briefings and coaching. Push notification reminders for your deadlines. And Backup &amp; Restore to keep your data safe.
                     </p>
-                  </div>
-
-                  {/* Micro-Illustration Preview */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                        <FileJson className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-                        apodict-backup.json
-                      </span>
-                      <span className="text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1">
-                        <FolderSync className="w-3 h-3" />
-                        Instant
-                      </span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 dark:text-slate-300 truncate">Courses, Roadmaps, Grades</span>
-                      <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold shrink-0 ml-2">Export / Import</span>
-                    </div>
                   </div>
                 </div>
               </ScrollReveal>
