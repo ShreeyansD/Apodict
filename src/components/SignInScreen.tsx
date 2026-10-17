@@ -277,9 +277,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
 
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
             <ScrollReveal delay={50} yOffset={0}>
-              <span className="block text-xs uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 mb-3 sm:mb-4">
-                Syllabus planner for college students
-              </span>
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.12]">
                 A planner that turns your syllabi into{' '}
                 <span className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-sky-500 dark:from-indigo-400 dark:via-indigo-300 dark:to-sky-400 bg-clip-text text-transparent [filter:drop-shadow(0_0_6px_rgba(99,102,241,0.06))] dark:[filter:drop-shadow(0_0_8px_rgba(129,140,248,0.10))]">
@@ -290,7 +287,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
 
             <ScrollReveal delay={120} yOffset={0}>
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
-                Stop digging through dozens of course PDFs. Extract assignment dates, identify heavy crunch weeks, break down big projects, and sync straight to Google Calendar.
+                Stop digging through dozens of course PDFs. Extract assignment dates, identify heavy workload weeks, break down big projects, and sync straight to Google Calendar.
               </p>
             </ScrollReveal>
 
@@ -460,7 +457,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ deletionConfirmation
                       Collision Map
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Pinpoints high-stakes weeks where multiple exams, papers, or projects overlap so you never get blindsided by a crunch week.
+                      Pinpoints high-stakes weeks where multiple exams, papers, or projects overlap so you never get blindsided by a busy week.
                     </p>
                   </div>
                 </div>

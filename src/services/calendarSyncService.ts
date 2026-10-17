@@ -662,7 +662,8 @@ Managed by Apodict. Changes made in the app will replace edits made here.`;
           for (const course of coursesToSync) {
             if (currentSettings.courseToggles[course.id] === false) continue;
             for (const dl of course.deadlines) {
-              if (!dl.date) { skippedNoDate++; continue; }
+              const isExact = (dl.dateStatus === 'exact' || !dl.dateStatus) && !!dl.date;
+              if (!isExact) { skippedNoDate++; continue; }
               const ex = (dl.calendarEventId && byId.get(dl.calendarEventId)) || byDeadline.get(dl.id);
               tasks.push({
                 kind: 'deadline',
@@ -896,8 +897,10 @@ Managed by Apodict. Changes made in the app will replace edits made here.`;
             const existingEvent = (deadline.calendarEventId && eventById.get(deadline.calendarEventId))
               || eventByDeadlineId.get(deadline.id);
 
-            if (!isCourseEnabled || !deadline.date) {
-              if (!deadline.date && isCourseEnabled) {
+            const isExact = (deadline.dateStatus === 'exact' || !deadline.dateStatus) && !!deadline.date;
+
+            if (!isCourseEnabled || !isExact) {
+              if (!isExact && isCourseEnabled) {
                 skippedDeadlinesCount++;
               }
 
@@ -1100,8 +1103,9 @@ Managed by Apodict. Changes made in the app will replace edits made here.`;
     if (settings.status === 'disconnected' || !settings.calendarId) return undefined;
     if (settings.courseToggles[course.id] === false) return undefined;
 
-    if (!deadline.date) {
-      // If deadline has no date, remove existing calendar event if any
+    const isExact = (deadline.dateStatus === 'exact' || !deadline.dateStatus) && !!deadline.date;
+    if (!isExact) {
+      // If deadline has no exact date (range, ambiguous, or missing), remove existing calendar event if any
       if (deadline.calendarEventId) {
         await calendarApiFetch(
           `/calendars/${encodeURIComponent(settings.calendarId)}/events/${encodeURIComponent(deadline.calendarEventId)}`,

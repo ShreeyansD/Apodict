@@ -202,3 +202,22 @@ export function formatDeadlineDateWithTheme(dateStr: string | null): DeadlineDat
 
   return { formatted: dateStr, relative: '', status: 'later', isPast: false, diffDays: null };
 }
+
+export function formatDeadlineRangeLabel(startDateStr: string | null, endDateStr?: string | null): string {
+  if (!startDateStr) return 'Date TBD';
+  if (!endDateStr || startDateStr === endDateStr) {
+    return formatDeadlineDateWithTheme(startDateStr).formatted;
+  }
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const sParts = startDateStr.split('-').map(Number);
+  const eParts = endDateStr.split('-').map(Number);
+  if (sParts.length === 3 && eParts.length === 3 && sParts[1] >= 1 && sParts[1] <= 12 && eParts[1] >= 1 && eParts[1] <= 12) {
+    const sMonth = MONTH_NAMES[sParts[1] - 1];
+    const eMonth = MONTH_NAMES[eParts[1] - 1];
+    if (sMonth === eMonth) {
+      return `${sMonth} ${sParts[2]}-${eParts[2]}`;
+    }
+    return `${sMonth} ${sParts[2]} – ${eMonth} ${eParts[2]}`;
+  }
+  return `${startDateStr} – ${endDateStr}`;
+}

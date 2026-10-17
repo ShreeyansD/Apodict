@@ -552,7 +552,10 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
   }, [courses]);
 
   const undatedDeadlinesCount = useMemo(() => {
-    return allDeadlinesWithCourse.filter((item) => !item.deadline.date).length;
+    return allDeadlinesWithCourse.filter((item) => {
+      const isExact = (item.deadline.dateStatus === 'exact' || !item.deadline.dateStatus) && !!item.deadline.date;
+      return !isExact;
+    }).length;
   }, [allDeadlinesWithCourse]);
 
   // Generate Upcoming Reminders Preview (Next 15)
@@ -571,7 +574,8 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
 
       const matchingItems = allDeadlinesWithCourse.filter(({ deadline, course }) => {
         if (deadline.completed) return false;
-        if (!deadline.date) return false;
+        const isExact = (deadline.dateStatus === 'exact' || !deadline.dateStatus) && !!deadline.date;
+        if (!isExact) return false;
 
         if (rule.scope.type === 'specific_assignment') {
           return deadline.id === rule.scope.deadlineId;
@@ -594,7 +598,8 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
       });
 
       for (const { deadline, course } of matchingItems) {
-        if (!deadline.date) continue;
+        const isExact = (deadline.dateStatus === 'exact' || !deadline.dateStatus) && !!deadline.date;
+        if (!isExact || !deadline.date) continue;
 
         for (const leadTime of rule.leadTimes) {
           const leadOption = LEAD_TIME_OPTIONS.find((opt) => opt.id === leadTime);
@@ -1581,11 +1586,20 @@ export const PushNotifications: React.FC<PushNotificationsProps> = ({ courses })
                     required
                   >
                     <option value="">-- Choose from saved deadlines --</option>
-                    {allDeadlinesWithCourse.map(({ deadline, course }) => (
-                      <option key={deadline.id} value={deadline.id}>
-                        {course.name} - {deadline.title} ({deadline.date || 'No Date'})
-                      </option>
-                    ))}
+                    {allDeadlinesWithCourse.map(({ deadline, course }) => {
+                      const isRange = deadline.dateStatus === 'range';
+                      const isUndated = !deadline.date || deadline.dateStatus === 'ambiguous' || deadline.dateStatus === 'missing';
+                      const label = isRange && deadline.dateEnd
+                        ? `${course.name} - ${deadline.title} (${deadline.date} to ${deadline.dateEnd} - Range)`
+                        : isUndated
+                        ? `${course.name} - ${deadline.title} (Needs date)`
+                        : `${course.name} - ${deadline.title} (${deadline.date})`;
+                      return (
+                        <option key={deadline.id} value={deadline.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}

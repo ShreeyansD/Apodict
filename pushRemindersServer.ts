@@ -289,16 +289,17 @@ async function evaluateUserReminders(
         continue;
       }
 
-      if (!deadline.date) {
+      const isExact = (deadline.dateStatus === 'exact' || !deadline.dateStatus) && !!deadline.date;
+      if (!isExact) {
         ruleEval.deadlines.push({
           deadlineId: deadline.id,
           deadlineTitle: deadline.title,
-          deadlineDate: null,
+          deadlineDate: deadline.date || null,
           courseName: course?.name || 'Course',
           leadTime: 'all',
           reminderInstantUtc: null,
           reminderInstantLocal: null,
-          status: 'skipped: no date',
+          status: deadline.dateStatus === 'range' ? 'skipped: date range (awaiting exact date)' : 'skipped: no date',
         });
         continue;
       }

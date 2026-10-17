@@ -12,7 +12,7 @@ import {
   Tag, 
   HelpCircle 
 } from 'lucide-react';
-import { Course, Deadline, DeadlineType, GradedCategory, ExtractedSyllabusData } from '../types/academic';
+import { Course, Deadline, DeadlineType, DateStatus, GradedCategory, ExtractedSyllabusData } from '../types/academic';
 import { AddMaterialsPanel } from './AddMaterialsPanel';
 
 interface MergeDiff {
@@ -83,6 +83,9 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       id: dl.id || `dl-edit-${idx}`,
       title: dl.title || '',
       date: dl.date || null,
+      dateStatus: dl.dateStatus || (dl.date ? 'exact' : 'missing'),
+      dateEnd: dl.dateEnd || null,
+      dateEvidence: dl.dateEvidence || null,
       type: dl.type || 'homework',
       weight: dl.weight !== undefined && dl.weight !== null ? Number(dl.weight) : null,
       completed: dl.completed || false,
@@ -90,6 +93,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
   );
 
   const [errorValidation, setErrorValidation] = useState<string | null>(null);
+  const [showSaveWarning, setShowSaveWarning] = useState(false);
 
   // Calculate total weight
   const totalWeight = categories.reduce((sum, c) => {
@@ -136,6 +140,9 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
         id: `dl-new-${Date.now()}`,
         title: 'New Assignment / Exam',
         date: new Date().toISOString().split('T')[0],
+        dateStatus: 'exact',
+        dateEnd: null,
+        dateEvidence: null,
         type: 'homework',
         weight: null,
         completed: false,
@@ -152,12 +159,46 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
             return { ...d, weight: num !== null && !isNaN(num) ? num : null };
           }
           if (field === 'date') {
-            return { ...d, date: value ? value : null };
+            const cleanVal = value ? value.trim() : null;
+            return {
+              ...d,
+              date: cleanVal,
+              dateStatus: cleanVal ? 'exact' : 'missing',
+              dateEnd: null,
+            };
           }
           return { ...d, [field]: value };
         }
         return d;
       })
+    );
+  };
+
+  const handleSetExactDate = (id: string, exactDate: string) => {
+    setDeadlines((prev) =>
+      prev.map((d) =>
+        d.id === id
+          ? {
+              ...d,
+              date: exactDate || null,
+              dateStatus: exactDate ? 'exact' : 'missing',
+              dateEnd: null,
+            }
+          : d
+      )
+    );
+  };
+
+  const handleKeepRange = (id: string) => {
+    setDeadlines((prev) =>
+      prev.map((d) =>
+        d.id === id
+          ? {
+              ...d,
+              dateStatus: 'range',
+            }
+          : d
+      )
     );
   };
 
@@ -209,11 +250,30 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       const hit = curDl.find((d) => norm(d.title) === norm(n.title));
       if (!hit) {
         if (!newDl.some((d) => norm(d.title) === norm(n.title))) {
-          newDl.push({ id: `dl-${uid(i)}`, title: n.title, date: n.date || null, type: n.type || 'homework', weight: n.weight ?? null, completed: false });
+          newDl.push({
+            id: `dl-${uid(i)}`,
+            title: n.title,
+            date: n.date || null,
+            dateStatus: n.dateStatus || (n.date ? 'exact' : 'missing'),
+            dateEnd: n.dateEnd || null,
+            dateEvidence: n.dateEvidence || null,
+            type: n.type || 'homework',
+            weight: n.weight ?? null,
+            completed: false,
+          });
         }
         return;
       }
-      if (!hit.date && n.date) { dlFill[hit.id] = { ...dlFill[hit.id], date: n.date }; filled++; }
+      if (!hit.date && n.date) {
+        dlFill[hit.id] = {
+          ...dlFill[hit.id],
+          date: n.date,
+          dateStatus: n.dateStatus || 'exact',
+          dateEnd: n.dateEnd || null,
+          dateEvidence: n.dateEvidence || hit.dateEvidence,
+        };
+        filled++;
+      }
       if (hit.weight == null && n.weight != null) { dlFill[hit.id] = { ...dlFill[hit.id], weight: n.weight }; filled++; }
       if (hit.date && n.date && hit.date !== n.date) {
         diffs.push({
@@ -240,13 +300,29 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
     });
   };
 
+  const unresolvedItems = deadlines.filter(
+    (d) => !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing'
+  );
+  const itemsNeedingConfirmation = deadlines.filter((d) => d.dateStatus !== 'exact');
+  const countNeedingConfirmation = itemsNeedingConfirmation.length;
+
   const handleSave = () => {
     if (!courseName.trim()) {
       setErrorValidation('Course name is required.');
       return;
     }
 
+    if (unresolvedItems.length > 0 && !showSaveWarning) {
+      setShowSaveWarning(true);
+      return;
+    }
+
+    handleExecuteSave();
+  };
+
+  const handleExecuteSave = () => {
     setErrorValidation(null);
+    setShowSaveWarning(false);
 
     onSave({
       id: initialData.id,
@@ -257,7 +333,30 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       color: selectedColor, // '' when None is chosen (stored as an empty string, never undefined)
       rawSyllabus: initialData.rawSyllabus,
       categories: categories.filter((c) => c.name.trim().length > 0),
-      deadlines: deadlines.filter((d) => d.title.trim().length > 0),
+      deadlines: deadlines
+        .filter((d) => d.title.trim().length > 0)
+        .map((d) => {
+          const isUnresolved = !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing';
+          if (isUnresolved) {
+            return {
+              ...d,
+              date: null,
+              dateStatus: (d.dateStatus === 'ambiguous' ? 'ambiguous' : 'missing') as DateStatus,
+              dateEnd: null,
+            };
+          }
+          if (d.dateStatus === 'range') {
+            return {
+              ...d,
+              dateStatus: 'range' as DateStatus,
+            };
+          }
+          return {
+            ...d,
+            dateStatus: 'exact' as DateStatus,
+            dateEnd: null,
+          };
+        }),
     });
   };
 
@@ -300,6 +399,17 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
             <div className="p-3 rounded-xl bg-rose-50/50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
               <span>{errorValidation}</span>
+            </div>
+          )}
+
+          {/* Top Summary Banner for Date Confirmation */}
+          {countNeedingConfirmation > 0 && (
+            <div className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="leading-relaxed">
+                <strong>{countNeedingConfirmation} {countNeedingConfirmation === 1 ? 'item needs' : 'items need'} date confirmation.</strong>{' '}
+                Review the flagged items below to confirm an exact date or keep a date range.
+              </div>
             </div>
           )}
 
@@ -578,82 +688,186 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {deadlines.length === 0 ? (
                 <div className="p-4 text-center text-xs text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
                   No deadlines found. Click below to add an assignment or exam date.
                 </div>
               ) : (
-                deadlines.map((deadline) => (
-                  <div
-                    key={deadline.id}
-                    className="flex flex-col md:flex-row items-stretch md:items-center gap-2 p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-                  >
-                    {/* Title */}
-                    <div className="flex-2">
-                      <input
-                        type="text"
-                        value={deadline.title}
-                        onChange={(e) => handleUpdateDeadline(deadline.id, 'title', e.target.value)}
-                        placeholder="Deliverable title (e.g. Midterm 1)"
-                        className="w-full px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </div>
+                deadlines.map((deadline) => {
+                  const isRange = deadline.dateStatus === 'range';
+                  const isAmbiguous = deadline.dateStatus === 'ambiguous';
+                  const isMissing = deadline.dateStatus === 'missing' || (!deadline.date && !isRange);
+                  const isUnresolved = isAmbiguous || isMissing;
 
-                    {/* Date */}
-                    <div className="w-full md:w-38">
-                      <input
-                        type="date"
-                        value={deadline.date || ''}
-                        onChange={(e) => handleUpdateDeadline(deadline.id, 'date', e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                        title="Deadline date (YYYY-MM-DD) or empty for null"
-                      />
-                    </div>
-
-                    {/* Type Selector */}
-                    <div className="w-full md:w-32">
-                      <select
-                        value={deadline.type}
-                        onChange={(e) => handleUpdateDeadline(deadline.id, 'type', e.target.value as DeadlineType)}
-                        className="w-full px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 capitalize"
-                      >
-                        <option value="exam">Exam</option>
-                        <option value="paper">Paper</option>
-                        <option value="homework">Homework</option>
-                        <option value="project">Project</option>
-                        <option value="quiz">Quiz</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-
-                    {/* Weight (optional/null) */}
-                    <div className="w-full md:w-28 flex items-center gap-1">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.5"
-                        value={deadline.weight === null ? '' : deadline.weight}
-                        onChange={(e) => handleUpdateDeadline(deadline.id, 'weight', e.target.value)}
-                        placeholder="Weight %"
-                        className="w-full px-2 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-500 text-right focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                        title="Individual weight if stated in syllabus, or null"
-                      />
-                      <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
-                    </div>
-
-                    {/* Delete */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDeadline(deadline.id)}
-                      className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors self-end md:self-center"
-                      title="Delete deadline"
+                  return (
+                    <div
+                      key={deadline.id}
+                      className={`p-3 rounded-xl bg-white dark:bg-slate-900 border transition-all space-y-2.5 ${
+                        isUnresolved
+                          ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/20'
+                          : isRange
+                          ? 'border-indigo-200 dark:border-indigo-800/80'
+                          : 'border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+                      {/* Top Row: Title, Category/Type, Weight, Delete */}
+                      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                        {/* Title */}
+                        <div className="flex-2">
+                          <input
+                            type="text"
+                            value={deadline.title}
+                            onChange={(e) => handleUpdateDeadline(deadline.id, 'title', e.target.value)}
+                            placeholder="Deliverable title (e.g. Midterm 1)"
+                            className="w-full px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {/* Type Selector */}
+                        <div className="w-full md:w-32">
+                          <select
+                            value={deadline.type}
+                            onChange={(e) => handleUpdateDeadline(deadline.id, 'type', e.target.value as DeadlineType)}
+                            className="w-full px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 capitalize"
+                          >
+                            <option value="exam">Exam</option>
+                            <option value="paper">Paper</option>
+                            <option value="homework">Homework</option>
+                            <option value="project">Project</option>
+                            <option value="quiz">Quiz</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+
+                        {/* Weight (optional/null) */}
+                        <div className="w-full md:w-28 flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={deadline.weight === null ? '' : deadline.weight}
+                            onChange={(e) => handleUpdateDeadline(deadline.id, 'weight', e.target.value)}
+                            placeholder="Weight %"
+                            className="w-full px-2 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-500 text-right focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                            title="Individual weight if stated in syllabus, or null"
+                          />
+                          <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
+                        </div>
+
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDeadline(deadline.id)}
+                          className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors self-end md:self-center"
+                          title="Delete deadline"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Bottom Row: Date status & resolution controls */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Warning Badges */}
+                          {isRange && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              Date range
+                            </span>
+                          )}
+                          {isAmbiguous && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                              Date unclear
+                            </span>
+                          )}
+                          {isMissing && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                              No date found
+                            </span>
+                          )}
+
+                          {/* Range resolution controls */}
+                          {isRange ? (
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="text-slate-600 dark:text-slate-300 font-mono">
+                                Range: <strong>{deadline.date}</strong> to <strong>{deadline.dateEnd}</strong>
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {deadline.date && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetExactDate(deadline.id, deadline.date!)}
+                                    className="px-2 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                                  >
+                                    Pick {deadline.date}
+                                  </button>
+                                )}
+                                {deadline.dateEnd && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetExactDate(deadline.id, deadline.dateEnd!)}
+                                    className="px-2 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                                  >
+                                    Pick {deadline.dateEnd}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleKeepRange(deadline.id)}
+                                  className="px-2 py-1 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                >
+                                  Keep as range
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-1 text-slate-500">
+                                <span>or pick exact:</span>
+                                <input
+                                  type="date"
+                                  value={deadline.date || ''}
+                                  onChange={(e) => handleSetExactDate(deadline.id, e.target.value)}
+                                  className="px-2 py-1 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white"
+                                />
+                              </div>
+                            </div>
+                          ) : isUnresolved ? (
+                            /* Ambiguous or missing item: show empty date input highlighted as needing attention */
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="date"
+                                value={deadline.date || ''}
+                                onChange={(e) => handleSetExactDate(deadline.id, e.target.value)}
+                                className="px-2.5 py-1.5 rounded-md bg-amber-50/50 dark:bg-amber-950/40 border border-amber-400 dark:border-amber-600 text-xs text-slate-900 dark:text-white ring-2 ring-amber-400/30 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                                title="Needs confirmation: select a date"
+                              />
+                              <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                Select date to confirm
+                              </span>
+                            </div>
+                          ) : (
+                            /* Exact date */
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">Date:</span>
+                              <input
+                                type="date"
+                                value={deadline.date || ''}
+                                onChange={(e) => handleUpdateDeadline(deadline.id, 'date', e.target.value)}
+                                className="px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Evidence citation from syllabus */}
+                      {deadline.dateEvidence && (
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 italic pt-0.5 border-t border-dashed border-slate-100 dark:border-slate-800/60">
+                          Syllabus says: &ldquo;{deadline.dateEvidence}&rdquo;
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -667,6 +881,35 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Unresolved items save confirmation warning */}
+        {showSaveWarning && unresolvedItems.length > 0 && (
+          <div className="px-6 py-4 bg-amber-50 dark:bg-amber-950/80 border-t border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-3 shrink-0">
+            <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>{unresolvedItems.length} {unresolvedItems.length === 1 ? 'item has' : 'items have'} no confirmed date</span>
+            </div>
+            <p className="leading-relaxed">
+              Unresolved items will be saved without a date and will appear in a <strong>Needs a date</strong> section in your Planner. They will not appear on your Collision Map, push reminders, or Google Calendar sync until you set a date.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowSaveWarning(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 font-semibold"
+              >
+                Go back &amp; confirm dates
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteSave}
+                className="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-xs"
+              >
+                Save anyway
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between shrink-0">

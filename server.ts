@@ -177,8 +177,18 @@ CRITICAL INSTRUCTIONS:
    - ALWAYS output weights as percentage numbers from 0 to 100 (e.g. 1 means 1%, 25 means 25%, 30 means 30%). A category weight of 1 means 1%, not 100%. NEVER use decimals or fractions like 0.30 or 0.01.
    - If a weight is not explicitly stated or is ambiguous, use null. DO NOT guess.
 7. Extract all specific assignment, paper, project, homework, quiz, and exam deadlines mentioned.
+   For every deadline or deliverable item:
    - title: concise descriptive title
-   - date: format as "YYYY-MM-DD". The current year is 2026. If only month/day are given (e.g. "October 14" or "Nov 3"), use 2026. If date is not stated, return null. DO NOT invent dates.
+   - dateStatus: MUST be one of: "exact" | "range" | "ambiguous" | "missing".
+     * "exact" ONLY if the syllabus states one specific day (and the month/year can be determined from the syllabus itself).
+     * "range" if the syllabus gives a window or multiple days (e.g. "Oct 19-22", "week of Oct 19", "between Oct 19 and 22"). Put the first day in date and the last day in dateEnd.
+     * "ambiguous" if the date is vague or depends on something else (e.g. "mid-October", "TBA", "per instructor", "after Unit 3", "Week 7" with no week-to-date mapping, or a conflict between two places in the syllabus). Leave date empty/null.
+     * "missing" if no date is given. Leave date empty/null.
+     * NEVER infer, round, or choose a date when unsure. NEVER default a range to its first day. If in doubt, use "ambiguous" or "missing" and leave date empty/null.
+     * ONLY infer the year from clear syllabus context (term or semester header); otherwise mark ambiguous and leave date empty/null.
+   - date: format as "YYYY-MM-DD" for "exact", or first day for "range". Leave empty/null for "ambiguous" or "missing".
+   - dateEnd: format as "YYYY-MM-DD" only for ranges (the last day of the range). Leave empty/null if not a range.
+   - dateEvidence: the exact text from the syllabus that the date came from (max ~120 chars), or empty/null if missing.
    - type: must be one of: "exam", "paper", "homework", "project", "quiz", "other".
    - weight: percentage of final grade as a number from 0 to 100 if specifically stated for this individual deadline (e.g., 15 for 15%, 1 for 1%), or null if not stated. Never return fractional decimals like 0.15.
 8. REMOVE DUPLICATE DEADLINES: If the same assignment, exam, paper, or quiz appears in more than one file or in both the text and a PDF, MERGE them into a single deadline. Do not output duplicate items.
@@ -229,11 +239,17 @@ CRITICAL INSTRUCTIONS:
                 type: Type.OBJECT,
                 properties: {
                   title: { type: Type.STRING },
-                  date: { type: Type.STRING },
+                  date: { type: Type.STRING, description: 'YYYY-MM-DD for exact or first day of range. Empty/null if ambiguous or missing' },
+                  dateStatus: {
+                    type: Type.STRING,
+                    description: 'exact | range | ambiguous | missing',
+                  },
+                  dateEnd: { type: Type.STRING, description: 'YYYY-MM-DD for last day of range, or empty/null' },
+                  dateEvidence: { type: Type.STRING, description: 'Exact snippet from syllabus up to 120 chars where the date came from' },
                   type: { type: Type.STRING },
                   weight: { type: Type.NUMBER },
                 },
-                required: ['title', 'type'],
+                required: ['title', 'type', 'dateStatus'],
               },
             },
           },
@@ -245,23 +261,69 @@ CRITICAL INSTRUCTIONS:
     const textOutput = response.text?.trim() || '{}';
     const parsedData = JSON.parse(textOutput);
 
-    // Deduplicate deadlines programmatically as a safeguard
+    // Helper to validate YYYY-MM-DD ISO format
+    const isValidIsoDate = (d: any): boolean => {
+      if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return false;
+      const [y, m, day] = d.trim().split('-').map(Number);
+      if (y < 2000 || y > 2100 || m < 1 || m > 12 || day < 1 || day > 31) return false;
+      const test = new Date(Date.UTC(y, m - 1, day));
+      return test.getUTCFullYear() === y && test.getUTCMonth() === m - 1 && test.getUTCDate() === day;
+    };
+
+    // Post-parse validation step in code:
+    // If dateStatus is "exact" but date is not a valid YYYY-MM-DD,
+    // or dateStatus is "range" without a valid dateEnd on or after date,
+    // downgrade it to "ambiguous" and clear the date.
     const rawDeadlines = Array.isArray(parsedData.deadlines) ? parsedData.deadlines : [];
     const uniqueDeadlines: any[] = [];
     const seenDeadlineKeys = new Set<string>();
 
     for (const dl of rawDeadlines) {
+      let status = (dl.dateStatus || '').toString().trim().toLowerCase();
+      let dateVal = typeof dl.date === 'string' && dl.date.trim() ? dl.date.trim() : null;
+      let dateEndVal = typeof dl.dateEnd === 'string' && dl.dateEnd.trim() ? dl.dateEnd.trim() : null;
+      const evidence = typeof dl.dateEvidence === 'string' && dl.dateEvidence.trim() ? dl.dateEvidence.trim().slice(0, 120) : null;
+
+      if (!['exact', 'range', 'ambiguous', 'missing'].includes(status)) {
+        status = dateVal ? 'exact' : 'missing';
+      }
+
+      if (status === 'exact') {
+        if (!isValidIsoDate(dateVal)) {
+          status = 'ambiguous';
+          dateVal = null;
+          dateEndVal = null;
+        } else {
+          dateEndVal = null;
+        }
+      } else if (status === 'range') {
+        if (!isValidIsoDate(dateVal) || !isValidIsoDate(dateEndVal) || dateEndVal < dateVal) {
+          status = 'ambiguous';
+          dateVal = null;
+          dateEndVal = null;
+        }
+      } else if (status === 'ambiguous' || status === 'missing') {
+        dateVal = null;
+        dateEndVal = null;
+      }
+
       const normTitle = (dl.title || '').trim().toLowerCase();
-      const normDate = (dl.date || '').trim();
-      const key = `${normTitle}|${normDate}`;
+      const normDate = dateVal || status;
+      const normEnd = dateEndVal || '';
+      const key = `${normTitle}|${normDate}|${normEnd}`;
+
       if (!seenDeadlineKeys.has(key)) {
         seenDeadlineKeys.add(key);
         uniqueDeadlines.push({
-          ...dl,
+          title: (dl.title || 'Assignment').trim(),
+          date: dateVal,
+          dateStatus: status,
+          dateEnd: dateEndVal,
+          dateEvidence: evidence,
           type: ['exam', 'paper', 'homework', 'project', 'quiz', 'other'].includes(dl.type?.toLowerCase())
             ? dl.type.toLowerCase()
             : 'homework',
-          date: dl.date && typeof dl.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dl.date) ? dl.date : null,
+          weight: typeof dl.weight === 'number' && !isNaN(dl.weight) ? dl.weight : null,
         });
       }
     }

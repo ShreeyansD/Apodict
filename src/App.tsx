@@ -138,6 +138,21 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const handleCoursesUpdated = async () => {
+      try {
+        const all = await dataStore.getCourses();
+        if (all && all.length > 0) {
+          setCourses([...all]);
+        }
+      } catch (err) {
+        console.warn('Failed to sync courses on update event:', err);
+      }
+    };
+    window.addEventListener('courses-updated', handleCoursesUpdated);
+    return () => window.removeEventListener('courses-updated', handleCoursesUpdated);
+  }, []);
   
   const handleRetrySave = async () => {
     if (!saveError) return;
@@ -266,6 +281,9 @@ export default function App() {
         id: `dl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${idx}`,
         title: d.title,
         date: d.date || null,
+        dateStatus: d.dateStatus || (d.date ? 'exact' : 'missing'),
+        dateEnd: d.dateEnd || null,
+        dateEvidence: d.dateEvidence || null,
         type: d.type || 'homework',
         weight: d.weight !== undefined ? d.weight : null,
         completed: false,
@@ -393,6 +411,22 @@ export default function App() {
       console.error('Error toggling deadline:', err);
       const all = await dataStore.getCourses();
       setCourses([...all]);
+    }
+  };
+
+  const handleSetDeadlineDate = async (courseId: string, deadlineId: string, newDate: string) => {
+    try {
+      const updated = await dataStore.setDeadlineDate(courseId, deadlineId, newDate);
+      if (updated) {
+        setCourses((prev) => prev.map((c) => (c.id === courseId ? updated : c)));
+        showToast('Deadline date confirmed.');
+        const dl = updated.deadlines.find((d) => d.id === deadlineId);
+        if (dl) {
+          calendarSyncService.syncDeadline(updated, dl).catch((e) => console.warn('Background calendar sync notice:', e));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to set deadline date:', e);
     }
   };
   
@@ -815,6 +849,7 @@ export default function App() {
               <Planner
                 courses={courses}
                 onOpenAddCourse={() => setIsAddModalOpen(true)}
+                onSetDeadlineDate={handleSetDeadlineDate}
               />
             )}
             {activeTab === 'examprep' && (

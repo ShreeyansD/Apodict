@@ -16,7 +16,8 @@ import { Course } from '../types/academic';
 import { 
   DEADLINE_TYPE_THEME, 
   DUE_DATE_STATUS_THEME, 
-  formatDeadlineDateWithTheme 
+  formatDeadlineDateWithTheme,
+  formatDeadlineRangeLabel
 } from '../theme/markerTheme';
 
 interface CourseCardProps {
@@ -404,29 +405,53 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-slate-400 dark:text-slate-500 shrink-0" />
-                            <span>{dateInfo.formatted}</span>
-                          </span>
+                          {deadline.dateStatus === 'range' && deadline.dateEnd ? (
+                            <>
+                              <span className="flex items-center gap-1 font-mono text-slate-700 dark:text-slate-300">
+                                <Calendar className="w-3 h-3 text-indigo-500 shrink-0" />
+                                <span>{formatDeadlineRangeLabel(deadline.date, deadline.dateEnd)}</span>
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                Date range
+                              </span>
+                            </>
+                          ) : !deadline.date || deadline.dateStatus === 'ambiguous' || deadline.dateStatus === 'missing' ? (
+                            <>
+                              <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                                <Calendar className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span>{deadline.dateStatus === 'ambiguous' ? 'Date unclear' : 'No date found'}</span>
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                Needs date
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-slate-400 dark:text-slate-500 shrink-0" />
+                                <span>{dateInfo.formatted}</span>
+                              </span>
 
-                          {dateInfo.relative && !deadline.completed && (
-                            statusConfig.hasPill ? (
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1 shrink-0 ${statusConfig.pillClass}`}
-                              >
-                                {statusConfig.iconType === 'alert' && (
-                                  <AlertCircle className={`w-3 h-3 shrink-0 ${statusConfig.iconClass}`} />
-                                )}
-                                {statusConfig.iconType === 'clock' && (
-                                  <Clock className={`w-3 h-3 shrink-0 ${statusConfig.iconClass}`} />
-                                )}
-                                <span>{dateInfo.relative}</span>
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 dark:text-slate-400 text-xs">
-                                {dateInfo.relative}
-                              </span>
-                            )
+                              {dateInfo.relative && !deadline.completed && (
+                                statusConfig.hasPill ? (
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] inline-flex items-center gap-1 shrink-0 ${statusConfig.pillClass}`}
+                                  >
+                                    {statusConfig.iconType === 'alert' && (
+                                      <AlertCircle className={`w-3 h-3 shrink-0 ${statusConfig.iconClass}`} />
+                                    )}
+                                    {statusConfig.iconType === 'clock' && (
+                                      <Clock className={`w-3 h-3 shrink-0 ${statusConfig.iconClass}`} />
+                                    )}
+                                    <span>{dateInfo.relative}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 dark:text-slate-400 text-xs">
+                                    {dateInfo.relative}
+                                  </span>
+                                )
+                              )}
+                            </>
                           )}
 
                           {deadline.weight !== null && (

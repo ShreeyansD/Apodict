@@ -8,10 +8,15 @@ export interface GradedCategory {
   currentScore?: number | null; // e.g. 92 for 92%, null if not yet graded
 }
 
+export type DateStatus = 'exact' | 'range' | 'ambiguous' | 'missing';
+
 export interface Deadline {
   id: string;
   title: string;
   date: string | null; // 'YYYY-MM-DD' or null
+  dateStatus?: DateStatus;
+  dateEnd?: string | null; // 'YYYY-MM-DD' or null, only for ranges
+  dateEvidence?: string | null; // Exact snippet from syllabus up to 120 chars
   type: DeadlineType;
   weight: number | null; // e.g. 15 for 15%, null if not stated
   completed?: boolean;
@@ -54,6 +59,9 @@ export interface ExtractedSyllabusData {
   deadlines: Array<{
     title: string;
     date: string | null;
+    dateStatus?: DateStatus;
+    dateEnd?: string | null;
+    dateEvidence?: string | null;
     type: DeadlineType;
     weight: number | null;
   }>;

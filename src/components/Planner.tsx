@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CalendarDays,
-  
   Plus, 
   CheckCircle2, 
   Circle, 
@@ -13,19 +12,20 @@ import {
   ArrowRight, 
   ChevronRight, 
   BookOpen,
-  
   Target
 } from 'lucide-react';
-import { Course, AssignmentPlan, Milestone } from '../types/academic';
+import { Course, Deadline, AssignmentPlan, Milestone } from '../types/academic';
+import { DEADLINE_TYPE_THEME } from '../theme/markerTheme';
 import { dataStore } from '../services/dataStore';
 import { geminiClient } from '../services/geminiClient';
 
 interface PlannerProps {
   courses: Course[];
   onOpenAddCourse: () => void;
+  onSetDeadlineDate?: (courseId: string, deadlineId: string, newDate: string) => void;
 }
 
-export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse }) => {
+export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse, onSetDeadlineDate }) => {
   const [plans, setPlans] = useState<AssignmentPlan[]>([]);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
@@ -42,6 +42,58 @@ export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse }) =>
   const [promptText, setPromptText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Date input state for undated items
+  const [dateInputs, setDateInputs] = useState<Record<string, string>>({});
+  const [settingDateId, setSettingDateId] = useState<string | null>(null);
+
+  // Gather all items that need a date across all courses
+  const itemsNeedingDate = useMemo(() => {
+    const list: Array<{
+      courseId: string;
+      courseName: string;
+      courseCode: string | null;
+      courseColor: string;
+      deadline: Deadline;
+    }> = [];
+
+    courses.forEach((c) => {
+      c.deadlines.forEach((d) => {
+        const isNoDate = !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing';
+        if (isNoDate) {
+          list.push({
+            courseId: c.id,
+            courseName: c.name,
+            courseCode: c.code || null,
+            courseColor: c.color || '#3B82F6',
+            deadline: d,
+          });
+        }
+      });
+    });
+
+    return list;
+  }, [courses]);
+
+  const handleConfirmDate = async (targetCourseId: string, deadlineId: string) => {
+    const chosen = dateInputs[deadlineId];
+    if (!chosen || !chosen.trim()) return;
+    setSettingDateId(deadlineId);
+    try {
+      if (onSetDeadlineDate) {
+        await onSetDeadlineDate(targetCourseId, deadlineId, chosen.trim());
+      } else {
+        await dataStore.setDeadlineDate(targetCourseId, deadlineId, chosen.trim());
+      }
+      setDateInputs((prev) => {
+        const copy = { ...prev };
+        delete copy[deadlineId];
+        return copy;
+      });
+    } finally {
+      setSettingDateId(null);
+    }
+  };
 
   useEffect(() => {
     loadPlans();
@@ -70,10 +122,10 @@ export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse }) =>
     }
   };
 
-  // Extract all deadlines from all courses for the picker
+  // Extract all deadlines from all courses for the picker (only exact or range with date)
   const availableDeadlines = courses.flatMap((c) =>
     c.deadlines
-      .filter((d) => d.date)
+      .filter((d) => d.date && d.dateStatus !== 'missing' && d.dateStatus !== 'ambiguous')
       .map((d) => ({
         key: `${c.id}|${d.id}`,
         title: d.title,
@@ -226,6 +278,110 @@ export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse }) =>
           <span>New Assignment Plan</span>
         </button>
       </div>
+
+      {/* Needs a Date Section */}
+      {itemsNeedingDate.length > 0 && (
+        <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300/80 dark:border-amber-800/80 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 dark:border-amber-800/60 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <span>Needs a date</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    {itemsNeedingDate.length}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  These items were extracted without an exact deadline. Assign an exact date to include them on your Collision Map, push reminders, and calendar sync.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {itemsNeedingDate.map(({ courseId, courseName, courseCode, courseColor, deadline }) => {
+              const typeConfig = DEADLINE_TYPE_THEME[deadline.type] || DEADLINE_TYPE_THEME.other;
+              const isUnclear = deadline.dateStatus === 'ambiguous';
+              const inputVal = dateInputs[deadline.id] || '';
+
+              return (
+                <div
+                  key={`${courseId}-${deadline.id}`}
+                  className="p-3.5 rounded-xl bg-amber-50/30 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/70 space-y-2.5 flex flex-col justify-between"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: courseColor }}
+                        />
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate">
+                          {courseCode || courseName}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border uppercase tracking-wider ${typeConfig.badgeClass}`}>
+                        {typeConfig.label}
+                      </span>
+                    </div>
+
+                    <div className="text-sm font-bold text-slate-900 dark:text-white">
+                      {deadline.title}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                        isUnclear
+                          ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
+                      }`}>
+                        {isUnclear ? 'Date unclear' : 'No date found'}
+                      </span>
+                      {deadline.weight !== null && (
+                        <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 font-medium">
+                          {deadline.weight}% of grade
+                        </span>
+                      )}
+                    </div>
+
+                    {deadline.dateEvidence && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        Syllabus says: &ldquo;{deadline.dateEvidence}&rdquo;
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Date Input & Confirm Action */}
+                  <div className="pt-2 border-t border-amber-200/50 dark:border-amber-800/50 flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={inputVal}
+                      onChange={(e) => setDateInputs((prev) => ({ ...prev, [deadline.id]: e.target.value }))}
+                      className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 flex-1"
+                    />
+                    <button
+                      type="button"
+                      disabled={!inputVal || settingDateId === deadline.id}
+                      onClick={() => handleConfirmDate(courseId, deadline.id)}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white text-xs font-semibold shadow-xs transition-colors shrink-0 flex items-center gap-1.5"
+                    >
+                      {settingDateId === deadline.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Set Date</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Plan Creation Modal / Card */}
       {isCreatingNew && (

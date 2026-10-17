@@ -1,4 +1,4 @@
-import { Course, GradedCategory, Deadline, DeadlineType, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
+import { Course, GradedCategory, Deadline, DeadlineType, DateStatus, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
 import { NotificationSettings, NotificationRule, NotificationRuleScope, ReminderLeadTime } from '../types/notifications';
 import { PushSettings, PushRule } from '../types/push';
 import { calendarSyncService, registerDataStoreHooks } from './calendarSyncService';
@@ -1940,6 +1940,9 @@ export const dataStore = {
                 id: d.id || `dl-${Date.now()}-${i}`,
                 title: d.title.trim(),
                 date: d.date ? d.date.trim() : null,
+                dateStatus: d.dateStatus !== undefined ? d.dateStatus : prev?.dateStatus,
+                dateEnd: d.dateEnd !== undefined ? (d.dateEnd ? d.dateEnd.trim() : null) : (prev?.dateEnd ? prev.dateEnd.trim() : null),
+                dateEvidence: d.dateEvidence !== undefined ? (d.dateEvidence ? d.dateEvidence.trim() : null) : (prev?.dateEvidence ?? null),
                 type: d.type || 'homework',
                 weight: d.weight !== null && !isNaN(Number(d.weight)) ? Number(d.weight) : null,
                 completed: d.completed ?? false,
@@ -1982,6 +1985,9 @@ export const dataStore = {
           id: d.id || `dl-${Date.now()}-${i}`,
           title: d.title.trim(),
           date: d.date ? d.date.trim() : null,
+          dateStatus: d.dateStatus,
+          dateEnd: d.dateEnd ? d.dateEnd.trim() : null,
+          dateEvidence: d.dateEvidence ? d.dateEvidence.trim() : null,
           type: d.type || 'homework',
           weight: d.weight !== null && !isNaN(Number(d.weight)) ? Number(d.weight) : null,
           completed: false,
@@ -1999,6 +2005,44 @@ export const dataStore = {
       courses.unshift(newCourse);
       persistToStorage(courses, newCourse);
       return newCourse;
+    });
+  },
+
+  /**
+   * Set an exact date for a previously ambiguous/missing deadline
+   */
+  async setDeadlineDate(courseId: string, deadlineId: string, date: string): Promise<Course | null> {
+    return await withCourseMutationLock(async () => {
+      const courses = [...loadFromStorage()];
+      const courseIndex = courses.findIndex((c) => c.id === courseId);
+      if (courseIndex === -1) return null;
+
+      const existingCourse = courses[courseIndex];
+      const cleanDate = date ? date.trim() : null;
+      const updatedDeadlines = existingCourse.deadlines.map((d) =>
+        d.id === deadlineId
+          ? {
+              ...d,
+              date: cleanDate,
+              dateStatus: (cleanDate ? 'exact' : 'missing') as DateStatus,
+              dateEnd: null,
+            }
+          : { ...d }
+      );
+
+      const updatedCourse: Course = {
+        ...existingCourse,
+        deadlines: updatedDeadlines,
+        updatedAt: new Date().toISOString(),
+      };
+      courses[courseIndex] = updatedCourse;
+      persistToStorage(courses, updatedCourse);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('courses-updated'));
+      }
+
+      return updatedCourse;
     });
   },
 

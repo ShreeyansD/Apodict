@@ -89,6 +89,25 @@ function formatShortDateStr(dateStr: string): string {
   return dateStr;
 }
 
+function formatRangeLabel(startDateStr: string, endDateStr?: string | null): string {
+  if (!endDateStr || startDateStr === endDateStr) {
+    return formatShortDateStr(startDateStr);
+  }
+  const sNorm = normalizeDateStr(startDateStr);
+  const eNorm = normalizeDateStr(endDateStr);
+  const sParts = sNorm.split('-').map(Number);
+  const eParts = eNorm.split('-').map(Number);
+  if (sParts.length === 3 && eParts.length === 3 && sParts[1] >= 1 && sParts[1] <= 12 && eParts[1] >= 1 && eParts[1] <= 12) {
+    const sMonth = MONTH_NAMES[sParts[1] - 1];
+    const eMonth = MONTH_NAMES[eParts[1] - 1];
+    if (sMonth === eMonth) {
+      return `${sMonth} ${sParts[2]}-${eParts[2]}`;
+    }
+    return `${sMonth} ${sParts[2]} – ${eMonth} ${eParts[2]}`;
+  }
+  return `${startDateStr} – ${endDateStr}`;
+}
+
 export const CollisionMap: React.FC<CollisionMapProps> = ({
   courses,
   onOpenAddCourse,
@@ -99,12 +118,13 @@ export const CollisionMap: React.FC<CollisionMapProps> = ({
   const [analysis, setAnalysis] = useState<SemesterAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
-  // 1. Gather all deadlines with date, sorted chronologically
+  // 1. Gather all deadlines with confirmed date or range (exclude ambiguous and missing)
   const allDeadlines = useMemo<DeadlineWithCourse[]>(() => {
     const list: DeadlineWithCourse[] = [];
     courses.forEach((c) => {
       c.deadlines.forEach((d) => {
-        if (d.date) {
+        const isExcluded = !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing';
+        if (!isExcluded) {
           list.push({
             ...d,
             courseId: c.id,
@@ -155,7 +175,11 @@ export const CollisionMap: React.FC<CollisionMapProps> = ({
     }
 
     const firstDateStr = normalizeDateStr(allDeadlines[0].date!);
-    const lastDateStr = normalizeDateStr(allDeadlines[allDeadlines.length - 1].date!);
+    // Last date is the latest date or dateEnd across all items
+    const lastDateStr = allDeadlines.reduce((max, item) => {
+      const end = normalizeDateStr(item.dateEnd || item.date!);
+      return end > max ? end : max;
+    }, normalizeDateStr(allDeadlines[0].date!));
 
     // Start on Monday of the first week (using UTC to prevent timezone/DST distortion)
     const [startY, startM, startD] = firstDateStr.split('-').map(Number);
@@ -182,11 +206,12 @@ export const CollisionMap: React.FC<CollisionMapProps> = ({
       const weekStartStr = toIsoDateStr(currentStart);
       const weekEndStr = toIsoDateStr(currentEnd);
 
-      // Find items in this week strictly within week boundaries
+      // Find items in this week: range items are counted across the whole window
       const itemsInWeek = allDeadlines.filter((item) => {
         if (!item.date) return false;
-        const itemDateStr = normalizeDateStr(item.date);
-        return itemDateStr >= weekStartStr && itemDateStr <= weekEndStr;
+        const itemStart = normalizeDateStr(item.date);
+        const itemEnd = item.dateEnd ? normalizeDateStr(item.dateEnd) : itemStart;
+        return itemStart <= weekEndStr && itemEnd >= weekStartStr;
       });
 
       // Calculate load score: exams and high-weight items count more
@@ -587,13 +612,38 @@ export const CollisionMap: React.FC<CollisionMapProps> = ({
                         >
                           {item.title}
                         </div>
+
+                        {/* Mobile date / range display */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5 sm:hidden text-xs text-slate-500">
+                          {item.dateStatus === 'range' && item.dateEnd ? (
+                            <>
+                              <span className="font-mono text-slate-700 dark:text-slate-300">
+                                {formatRangeLabel(item.date!, item.dateEnd)}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                Date range
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-mono text-slate-700 dark:text-slate-300">{item.date}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right hidden sm:block">
-                        <div className="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
-                          {item.date}
+                        <div className="flex items-center justify-end gap-1.5 text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+                          {item.dateStatus === 'range' && item.dateEnd ? (
+                            <>
+                              <span>{formatRangeLabel(item.date!, item.dateEnd)}</span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                Date range
+                              </span>
+                            </>
+                          ) : (
+                            <span>{item.date}</span>
+                          )}
                         </div>
                         {item.weight !== null && (
                           <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
