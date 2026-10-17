@@ -1,4 +1,4 @@
-import { Course, GradedCategory, Deadline, DeadlineType, DateStatus, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
+import { Course, GradedCategory, Deadline, DeadlineType, DateStatus, DateSource, AssignmentPlan, Milestone, ExamPrepData } from '../types/academic';
 import { NotificationSettings, NotificationRule, NotificationRuleScope, ReminderLeadTime } from '../types/notifications';
 import { PushSettings, PushRule } from '../types/push';
 import { calendarSyncService, registerDataStoreHooks } from './calendarSyncService';
@@ -1943,6 +1943,7 @@ export const dataStore = {
                 dateStatus: d.dateStatus !== undefined ? d.dateStatus : prev?.dateStatus,
                 dateEnd: d.dateEnd !== undefined ? (d.dateEnd ? d.dateEnd.trim() : null) : (prev?.dateEnd ? prev.dateEnd.trim() : null),
                 dateEvidence: d.dateEvidence !== undefined ? (d.dateEvidence ? d.dateEvidence.trim() : null) : (prev?.dateEvidence ?? null),
+                dateSource: d.dateSource !== undefined ? d.dateSource : prev?.dateSource,
                 type: d.type || 'homework',
                 weight: d.weight !== null && !isNaN(Number(d.weight)) ? Number(d.weight) : null,
                 completed: d.completed ?? false,
@@ -1988,6 +1989,7 @@ export const dataStore = {
           dateStatus: d.dateStatus,
           dateEnd: d.dateEnd ? d.dateEnd.trim() : null,
           dateEvidence: d.dateEvidence ? d.dateEvidence.trim() : null,
+          dateSource: d.dateSource,
           type: d.type || 'homework',
           weight: d.weight !== null && !isNaN(Number(d.weight)) ? Number(d.weight) : null,
           completed: false,
@@ -2026,6 +2028,56 @@ export const dataStore = {
               date: cleanDate,
               dateStatus: (cleanDate ? 'exact' : 'missing') as DateStatus,
               dateEnd: null,
+              dateSource: 'manual' as DateSource,
+            }
+          : { ...d }
+      );
+
+      const updatedCourse: Course = {
+        ...existingCourse,
+        deadlines: updatedDeadlines,
+        updatedAt: new Date().toISOString(),
+      };
+      courses[courseIndex] = updatedCourse;
+      persistToStorage(courses, updatedCourse);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('courses-updated'));
+      }
+
+      return updatedCourse;
+    });
+  },
+
+  /**
+   * Update deadline date details (exact, range, or missing/none) manually
+   */
+  async updateDeadlineDateDetails(
+    courseId: string,
+    deadlineId: string,
+    updates: {
+      date: string | null;
+      dateStatus: DateStatus;
+      dateEnd?: string | null;
+      dateSource?: DateSource;
+    }
+  ): Promise<Course | null> {
+    return await withCourseMutationLock(async () => {
+      const courses = [...loadFromStorage()];
+      const courseIndex = courses.findIndex((c) => c.id === courseId);
+      if (courseIndex === -1) return null;
+
+      const existingCourse = courses[courseIndex];
+      const cleanDate = updates.date ? updates.date.trim() : null;
+      const cleanDateEnd = updates.dateEnd ? updates.dateEnd.trim() : null;
+      const updatedDeadlines = existingCourse.deadlines.map((d) =>
+        d.id === deadlineId
+          ? {
+              ...d,
+              date: cleanDate,
+              dateStatus: updates.dateStatus,
+              dateEnd: updates.dateStatus === 'range' ? cleanDateEnd : null,
+              dateSource: (updates.dateSource || 'manual') as DateSource,
             }
           : { ...d }
       );

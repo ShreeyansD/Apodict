@@ -9,6 +9,7 @@ export interface GradedCategory {
 }
 
 export type DateStatus = 'exact' | 'range' | 'ambiguous' | 'missing';
+export type DateSource = 'syllabus' | 'manual';
 
 export interface Deadline {
   id: string;
@@ -17,6 +18,7 @@ export interface Deadline {
   dateStatus?: DateStatus;
   dateEnd?: string | null; // 'YYYY-MM-DD' or null, only for ranges
   dateEvidence?: string | null; // Exact snippet from syllabus up to 120 chars
+  dateSource?: DateSource; // 'syllabus' | 'manual', optional (defaults to 'syllabus')
   type: DeadlineType;
   weight: number | null; // e.g. 15 for 15%, null if not stated
   completed?: boolean;
@@ -62,6 +64,7 @@ export interface ExtractedSyllabusData {
     dateStatus?: DateStatus;
     dateEnd?: string | null;
     dateEvidence?: string | null;
+    dateSource?: DateSource;
     type: DeadlineType;
     weight: number | null;
   }>;

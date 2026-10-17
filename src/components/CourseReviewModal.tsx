@@ -12,8 +12,18 @@ import {
   Tag, 
   HelpCircle 
 } from 'lucide-react';
-import { Course, Deadline, DeadlineType, DateStatus, GradedCategory, ExtractedSyllabusData } from '../types/academic';
+import { Course, Deadline, DeadlineType, DateStatus, DateSource, GradedCategory, ExtractedSyllabusData } from '../types/academic';
 import { AddMaterialsPanel } from './AddMaterialsPanel';
+
+export type DateTypeOption = 'exact' | 'range' | 'none';
+
+export function getDeadlineDateType(d: Deadline): DateTypeOption {
+  if (d.dateStatus === 'range') return 'range';
+  if (d.dateStatus === 'missing' || d.dateStatus === 'ambiguous' || !d.date) {
+    return 'none';
+  }
+  return 'exact';
+}
 
 interface MergeDiff {
   id: string;
@@ -86,6 +96,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       dateStatus: dl.dateStatus || (dl.date ? 'exact' : 'missing'),
       dateEnd: dl.dateEnd || null,
       dateEvidence: dl.dateEvidence || null,
+      dateSource: dl.dateSource || 'syllabus',
       type: dl.type || 'homework',
       weight: dl.weight !== undefined && dl.weight !== null ? Number(dl.weight) : null,
       completed: dl.completed || false,
@@ -143,6 +154,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
         dateStatus: 'exact',
         dateEnd: null,
         dateEvidence: null,
+        dateSource: 'manual',
         type: 'homework',
         weight: null,
         completed: false,
@@ -165,11 +177,63 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
               date: cleanVal,
               dateStatus: cleanVal ? 'exact' : 'missing',
               dateEnd: null,
+              dateSource: 'manual',
             };
           }
           return { ...d, [field]: value };
         }
         return d;
+      })
+    );
+  };
+
+  const handleDateTypeSelect = (id: string, newType: DateTypeOption) => {
+    setDeadlines((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        if (newType === 'range') {
+          // Pre-fills start with current item's date (or today's date if empty) and leaves end empty and highlighted until filled
+          const today = new Date().toISOString().split('T')[0];
+          const startDate = d.date ? d.date : today;
+          return {
+            ...d,
+            date: startDate,
+            dateEnd: null,
+            dateStatus: 'range',
+            dateSource: 'manual',
+          };
+        }
+        if (newType === 'exact') {
+          // Switching to "Exact date" clears dateEnd
+          return {
+            ...d,
+            dateEnd: null,
+            dateStatus: 'exact',
+            dateSource: 'manual',
+          };
+        }
+        // "No date yet": no date inputs; item is saved with dateStatus "missing" and date and dateEnd cleared
+        return {
+          ...d,
+          date: null,
+          dateEnd: null,
+          dateStatus: 'missing',
+          dateSource: 'manual',
+        };
+      })
+    );
+  };
+
+  const handleDeadlineDateChange = (id: string, field: 'date' | 'dateEnd', value: string) => {
+    const cleanVal = value ? value.trim() : null;
+    setDeadlines((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        return {
+          ...d,
+          [field]: cleanVal,
+          dateSource: 'manual',
+        };
       })
     );
   };
@@ -183,6 +247,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
               date: exactDate || null,
               dateStatus: exactDate ? 'exact' : 'missing',
               dateEnd: null,
+              dateSource: 'manual',
             }
           : d
       )
@@ -196,6 +261,7 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
           ? {
               ...d,
               dateStatus: 'range',
+              dateSource: 'manual',
             }
           : d
       )
@@ -300,16 +366,38 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
     });
   };
 
-  const unresolvedItems = deadlines.filter(
-    (d) => !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing'
+  const unresolvedItems = deadlines.filter((d) => {
+    const type = getDeadlineDateType(d);
+    return type === 'none' || !d.date;
+  });
+  const itemsNeedingConfirmation = deadlines.filter(
+    (d) => d.dateSource !== 'manual' && d.dateStatus !== 'exact'
   );
-  const itemsNeedingConfirmation = deadlines.filter((d) => d.dateStatus !== 'exact');
   const countNeedingConfirmation = itemsNeedingConfirmation.length;
 
   const handleSave = () => {
     if (!courseName.trim()) {
       setErrorValidation('Course name is required.');
       return;
+    }
+
+    // Range validation: The end date must be on or after the start date. Show a professional inline error and block saving that item otherwise.
+    for (const d of deadlines) {
+      const type = getDeadlineDateType(d);
+      if (type === 'range') {
+        if (!d.date) {
+          setErrorValidation(`"${d.title || 'Assignment'}": Please enter a start date for the date range.`);
+          return;
+        }
+        if (!d.dateEnd) {
+          setErrorValidation(`"${d.title || 'Assignment'}": Please enter an end date for the date range.`);
+          return;
+        }
+        if (d.dateEnd < d.date) {
+          setErrorValidation(`"${d.title || 'Assignment'}": End date must be on or after the start date.`);
+          return;
+        }
+      }
     }
 
     if (unresolvedItems.length > 0 && !showSaveWarning) {
@@ -336,25 +424,32 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
       deadlines: deadlines
         .filter((d) => d.title.trim().length > 0)
         .map((d) => {
-          const isUnresolved = !d.date || d.dateStatus === 'ambiguous' || d.dateStatus === 'missing';
-          if (isUnresolved) {
+          const type = getDeadlineDateType(d);
+          const finalDateSource: DateSource = d.dateSource || 'syllabus';
+          if (type === 'none') {
             return {
               ...d,
               date: null,
-              dateStatus: (d.dateStatus === 'ambiguous' ? 'ambiguous' : 'missing') as DateStatus,
+              dateStatus: 'missing' as DateStatus,
               dateEnd: null,
+              dateSource: finalDateSource,
             };
           }
-          if (d.dateStatus === 'range') {
+          if (type === 'range') {
             return {
               ...d,
+              date: d.date ? d.date.trim() : null,
               dateStatus: 'range' as DateStatus,
+              dateEnd: d.dateEnd ? d.dateEnd.trim() : null,
+              dateSource: finalDateSource,
             };
           }
           return {
             ...d,
+            date: d.date ? d.date.trim() : null,
             dateStatus: 'exact' as DateStatus,
             dateEnd: null,
+            dateSource: finalDateSource,
           };
         }),
     });
@@ -695,10 +790,11 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
                 </div>
               ) : (
                 deadlines.map((deadline) => {
-                  const isRange = deadline.dateStatus === 'range';
-                  const isAmbiguous = deadline.dateStatus === 'ambiguous';
-                  const isMissing = deadline.dateStatus === 'missing' || (!deadline.date && !isRange);
-                  const isUnresolved = isAmbiguous || isMissing;
+                  const dateTypeOption = getDeadlineDateType(deadline);
+                  const isUnresolved = dateTypeOption === 'none' || !deadline.date;
+                  const isRange = dateTypeOption === 'range';
+                  const isRangeInvalid = isRange && deadline.date && deadline.dateEnd && deadline.dateEnd < deadline.date;
+                  const isRangeIncomplete = isRange && (!deadline.date || !deadline.dateEnd);
 
                   return (
                     <div
@@ -707,7 +803,9 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
                         isUnresolved
                           ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/20'
                           : isRange
-                          ? 'border-indigo-200 dark:border-indigo-800/80'
+                          ? isRangeInvalid
+                            ? 'border-rose-400 dark:border-rose-700 bg-rose-50/20 dark:bg-rose-950/20'
+                            : 'border-indigo-200 dark:border-indigo-800/80'
                           : 'border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
@@ -767,104 +865,143 @@ export const CourseReviewModal: React.FC<CourseReviewModalProps> = ({
                         </button>
                       </div>
 
-                      {/* Bottom Row: Date status & resolution controls */}
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {/* Warning Badges */}
-                          {isRange && (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                              Date range
-                            </span>
-                          )}
-                          {isAmbiguous && (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                              Date unclear
-                            </span>
-                          )}
-                          {isMissing && (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
-                              No date found
-                            </span>
+                      {/* Bottom Row: Date Type Selector and Inputs */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          {/* 1. Date Type Selector */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Date:</span>
+                            <select
+                              value={dateTypeOption}
+                              onChange={(e) => handleDateTypeSelect(deadline.id, e.target.value as DateTypeOption)}
+                              className="px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                            >
+                              <option value="exact">Exact date</option>
+                              <option value="range">Date range</option>
+                              <option value="none">No date yet</option>
+                            </select>
+                          </div>
+
+                          {/* 2. Controls according to chosen date type */}
+                          {dateTypeOption === 'exact' && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="date"
+                                value={deadline.date || ''}
+                                onChange={(e) => handleDeadlineDateChange(deadline.id, 'date', e.target.value)}
+                                className={`px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 ${
+                                  !deadline.date
+                                    ? 'border-amber-400 dark:border-amber-600 ring-2 ring-amber-400/20'
+                                    : 'border-slate-200 dark:border-slate-800'
+                                }`}
+                                required
+                              />
+                              {!deadline.date && (
+                                <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                  Select an exact date
+                                </span>
+                              )}
+                              {/* Quick pick helper if extracted syllabus range exists */}
+                              {deadline.dateSource !== 'manual' && deadline.dateEvidence && (
+                                <div className="flex items-center gap-1">
+                                  {deadline.date && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetExactDate(deadline.id, deadline.date!)}
+                                      className="px-2 py-0.5 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                                    >
+                                      Use {deadline.date}
+                                    </button>
+                                  )}
+                                  {deadline.dateEnd && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetExactDate(deadline.id, deadline.dateEnd!)}
+                                      className="px-2 py-0.5 rounded text-[11px] text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                                    >
+                                      Use {deadline.dateEnd}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
 
-                          {/* Range resolution controls */}
-                          {isRange ? (
-                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                              <span className="text-slate-600 dark:text-slate-300 font-mono">
-                                Range: <strong>{deadline.date}</strong> to <strong>{deadline.dateEnd}</strong>
-                              </span>
+                          {dateTypeOption === 'range' && (
+                            <div className="flex flex-wrap items-center gap-2">
                               <div className="flex items-center gap-1.5">
-                                {deadline.date && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetExactDate(deadline.id, deadline.date!)}
-                                    className="px-2 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-colors"
-                                  >
-                                    Pick {deadline.date}
-                                  </button>
-                                )}
-                                {deadline.dateEnd && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetExactDate(deadline.id, deadline.dateEnd!)}
-                                    className="px-2 py-1 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-colors"
-                                  >
-                                    Pick {deadline.dateEnd}
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleKeepRange(deadline.id)}
-                                  className="px-2 py-1 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
-                                >
-                                  Keep as range
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-1 text-slate-500">
-                                <span>or pick exact:</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">From</span>
                                 <input
                                   type="date"
                                   value={deadline.date || ''}
-                                  onChange={(e) => handleSetExactDate(deadline.id, e.target.value)}
-                                  className="px-2 py-1 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white"
+                                  onChange={(e) => handleDeadlineDateChange(deadline.id, 'date', e.target.value)}
+                                  className={`px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 ${
+                                    !deadline.date
+                                      ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/30'
+                                      : 'border-slate-200 dark:border-slate-800'
+                                  }`}
                                 />
                               </div>
-                            </div>
-                          ) : isUnresolved ? (
-                            /* Ambiguous or missing item: show empty date input highlighted as needing attention */
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="date"
-                                value={deadline.date || ''}
-                                onChange={(e) => handleSetExactDate(deadline.id, e.target.value)}
-                                className="px-2.5 py-1.5 rounded-md bg-amber-50/50 dark:bg-amber-950/40 border border-amber-400 dark:border-amber-600 text-xs text-slate-900 dark:text-white ring-2 ring-amber-400/30 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                                title="Needs confirmation: select a date"
-                              />
-                              <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                Select date to confirm
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">To</span>
+                                <input
+                                  type="date"
+                                  value={deadline.dateEnd || ''}
+                                  onChange={(e) => handleDeadlineDateChange(deadline.id, 'dateEnd', e.target.value)}
+                                  className={`px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500 ${
+                                    !deadline.dateEnd
+                                      ? 'border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/30'
+                                      : isRangeInvalid
+                                      ? 'border-rose-500 dark:border-rose-500 ring-2 ring-rose-500/30'
+                                      : 'border-slate-200 dark:border-slate-800'
+                                  }`}
+                                />
+                              </div>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                Date range
                               </span>
                             </div>
-                          ) : (
-                            /* Exact date */
+                          )}
+
+                          {dateTypeOption === 'none' && (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-500 dark:text-slate-400">Date:</span>
-                              <input
-                                type="date"
-                                value={deadline.date || ''}
-                                onChange={(e) => handleUpdateDeadline(deadline.id, 'date', e.target.value)}
-                                className="px-2.5 py-1.5 rounded-md bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                              />
+                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                                No date yet
+                              </span>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Saved with no date; will appear in Planner &ldquo;Needs a date&rdquo;
+                              </span>
                             </div>
                           )}
                         </div>
-                      </div>
 
-                      {/* Evidence citation from syllabus */}
-                      {deadline.dateEvidence && (
-                        <div className="text-[11px] text-slate-600 dark:text-slate-400 italic pt-0.5 border-t border-dashed border-slate-100 dark:border-slate-800/60">
-                          Syllabus says: &ldquo;{deadline.dateEvidence}&rdquo;
-                        </div>
-                      )}
+                        {/* Inline error for range validation */}
+                        {isRange && (
+                          <div>
+                            {isRangeIncomplete && !deadline.dateEnd && (
+                              <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                End date is required for a date range. Please select an end date.
+                              </p>
+                            )}
+                            {isRangeInvalid && (
+                              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                                End date must be on or after the start date ({deadline.date}).
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Evidence Citation or Manual Edit Notice */}
+                        {deadline.dateSource === 'manual' ? (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1 border-t border-dashed border-slate-100 dark:border-slate-800/60">
+                            Edited manually
+                          </div>
+                        ) : deadline.dateEvidence ? (
+                          <div className="text-[11px] text-slate-600 dark:text-slate-400 italic pt-1 border-t border-dashed border-slate-100 dark:border-slate-800/60">
+                            Syllabus says: &ldquo;{deadline.dateEvidence}&rdquo;
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })

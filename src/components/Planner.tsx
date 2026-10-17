@@ -347,11 +347,15 @@ export const Planner: React.FC<PlannerProps> = ({ courses, onOpenAddCourse, onSe
                       )}
                     </div>
 
-                    {deadline.dateEvidence && (
+                    {deadline.dateSource === 'manual' ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                        Edited manually
+                      </p>
+                    ) : deadline.dateEvidence ? (
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
                         Syllabus says: &ldquo;{deadline.dateEvidence}&rdquo;
                       </p>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Date Input & Confirm Action */}
